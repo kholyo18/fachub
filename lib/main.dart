@@ -1,10 +1,4 @@
-// ======================= Fachub (main.dart) — FIXED (Part 1/3) =======================
-// تمت مراجعة الملف لإصلاح:
-// - ترتيب imports
-// - تعارض CardTheme/ThemeData
-// - غياب copy() في ChatChannel
-// - تحويلات القوائم والتايب كاست
-// ملاحظة: هذا الملف مستقل ويعمل Offline/Online بحسب تهيئة Firebase.
+// ======================= Fachub (main.dart) — FULL with Offline→Online Sync (Part 1/3) =======================
 
 // ------------------------------- IMPORTS -------------------------------------
 import 'dart:convert';
@@ -56,7 +50,6 @@ class FachubApp extends StatelessWidget {
           foregroundColor: Colors.black87,
           elevation: 0.2,
         ),
-        // حذف/تبسيط cardTheme لتفادي تعارض CardThemeData
       ),
       home: HomeShell(isOnline: isOnline),
     );
@@ -269,6 +262,81 @@ class ChatMessage {
   });
 }
 
+// ------------------------------ PENDING QUEUE ---------------------------------
+// تخزين الرسائل غير المرسلة محلياً حتى تتوفر الشبكة ثم نرفعها لـ Firebase
+class PendingMessage {
+  final String channelId;
+  final String sender;
+  final String text;
+  final DateTime time;
+
+  PendingMessage({
+    required this.channelId,
+    required this.sender,
+    required this.text,
+    required this.time,
+  });
+
+  Map<String, dynamic> toMap() => {
+        'channelId': channelId,
+        'sender': sender,
+        'text': text,
+        'time': time.toIso8601String(),
+      };
+
+  factory PendingMessage.fromMap(Map<String, dynamic> m) => PendingMessage(
+        channelId: (m['channelId'] ?? '') as String,
+        sender: (m['sender'] ?? '') as String,
+        text: (m['text'] ?? '') as String,
+        time: DateTime.tryParse((m['time'] ?? '') as String) ?? DateTime.now(),
+      );
+}
+
+class PendingQueue {
+  static const _key = 'fachub_pending_msgs_v1';
+
+  // أضف رسالة إلى قائمة الانتظار
+  static Future<void> push(PendingMessage msg) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key);
+    final List list = raw == null ? [] : (json.decode(raw) as List);
+    list.add(msg.toMap());
+    await prefs.setString(_key, json.encode(list));
+  }
+
+  // استرجاع كل الرسائل المعلقة
+  static Future<List<PendingMessage>> all() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key);
+    if (raw == null) return [];
+    try {
+      final List list = json.decode(raw) as List;
+      return list.map((e) => PendingMessage.fromMap(Map<String, dynamic>.from(e))).toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  // تفريغ (بعد الرفع)
+  static Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key);
+  }
+
+  // عدد الرسائل المعلقة (اختياري للواجهة)
+  static Future<int> count() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_key);
+    if (raw == null) return 0;
+    try {
+      final List list = json.decode(raw) as List;
+      return list.length;
+    } catch (_) {
+      return 0;
+    }
+  }
+}
+
 // ------------------------------ LOCAL STORE ----------------------------------
 class LocalStore implements IDataStore {
   final _chs = <ChatChannel>[
@@ -315,15 +383,26 @@ class LocalStore implements IDataStore {
     yield _msgs[channelId]?.toList() ?? const <ChatMessage>[];
   }
 
+  // ✅ تعديل: إضافة الرسالة للواجهة + تخزين نسخة معلّقة لرفعها عند الاتصال
   @override
   Future<void> sendMessage(String channelId, String text, {required String sender}) async {
     final list = _msgs.putIfAbsent(channelId, () => []);
-    list.add(ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+    final now = DateTime.now();
+    final msg = ChatMessage(
+      id: now.millisecondsSinceEpoch.toString(),
       channelId: channelId,
       sender: sender,
       text: text,
-      time: DateTime.now(),
+      time: now,
+    );
+    list.add(msg);
+
+    // خزّن نسخة معلّقة لرفعها لاحقاً إلى Firebase
+    await PendingQueue.push(PendingMessage(
+      channelId: channelId,
+      sender: sender,
+      text: text,
+      time: now,
     ));
   }
 
@@ -378,7 +457,6 @@ class FirebaseStore implements IDataStore {
   @override
   Future<void> deleteChannel(String id) async {
     await db.collection('channels').doc(id).delete();
-    // حذف الرسائل اختياري
   }
 
   @override
@@ -413,7 +491,6 @@ class FirebaseStore implements IDataStore {
 
   @override
   Future<void> saveTerm(TermData t) async {
-    // حفظ محلي بديل لو ما في Auth — نقدر نوسعها لاحقًا
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(LocalStore._prefsKey, jsonEncode(encodeTerm(t)));
   }
@@ -428,6 +505,27 @@ class FirebaseStore implements IDataStore {
     } catch (_) {
       return sampleTerm();
     }
+  }
+}
+// ======================= Fachub (main.dart) — FULL with Offline→Online Sync (Part 2/3) =======================
+
+// ------------------------------ SYNC MANAGER ----------------------------------
+// يقرأ الرسائل المعلقة من SharedPreferences ويرفعها لـ Firestore عند الاتصال
+class SyncManager {
+  final FirebaseStore firebase;
+
+  SyncManager({required this.firebase});
+
+  Future<int> flushPending() async {
+    final pending = await PendingQueue.all();
+    if (pending.isEmpty) return 0;
+
+    for (final p in pending) {
+      await firebase.sendMessage(p.channelId, p.text, sender: p.sender);
+      // وقت الرسالة في Firestore سيكون serverTimestamp (مناسب للترتيب)
+    }
+    await PendingQueue.clear();
+    return pending.length;
   }
 }
 
@@ -450,6 +548,18 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     store = widget.isOnline ? FirebaseStore() : LocalStore();
     _loadTerm();
+
+    // ➜ لو Online حالياً، اعمل مزامنة للرسائل المعلقة
+    if (widget.isOnline && store is FirebaseStore) {
+      final sync = SyncManager(firebase: store as FirebaseStore);
+      sync.flushPending().then((n) {
+        if (n > 0 && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("تمت مزامنة $n رسالة معلّقة إلى السحابة")),
+          );
+        }
+      });
+    }
   }
 
   Future<void> _loadTerm() async {
@@ -508,163 +618,6 @@ class _BrandMark extends StatelessWidget {
     );
   }
 }
-
-// ------------------------------ GPA SCREEN -----------------------------------
-class GPAScreen extends StatefulWidget {
-  final TermData term;
-  final ValueChanged<TermData> onUpdate;
-  const GPAScreen({super.key, required this.term, required this.onUpdate});
-
-  @override
-  State<GPAScreen> createState() => _GPAScreenState();
-}
-
-class _GPAScreenState extends State<GPAScreen> {
-  late TermData _local;
-
-  @override
-  void initState() {
-    super.initState();
-    _local = widget.term.copy();
-  }
-
-  void _recalc() {
-    setState(() {});
-    widget.onUpdate(_local.copy());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final avg = termAverage(_local);
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("متوسط الفصل (GPA)", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
-                Text("${avg.toStringAsFixed(_local.system.roundTo)} / 20",
-                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: kFachubBlue)),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.check_circle, color: kFachubGreen),
-                    const SizedBox(width: 6),
-                    Text("عتبة النجاح: ${_local.system.passThreshold.toStringAsFixed(1)}"),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        ..._local.subjects.map((s) => _SubjectTile(
-              subject: s,
-              onChanged: (_) => _recalc(),
-            )),
-        const SizedBox(height: 64),
-      ],
-    );
-  }
-}
-
-class _SubjectTile extends StatefulWidget {
-  final Subject subject;
-  final ValueChanged<Subject> onChanged;
-  const _SubjectTile({required this.subject, required this.onChanged});
-
-  @override
-  State<_SubjectTile> createState() => _SubjectTileState();
-}
-
-class _SubjectTileState extends State<_SubjectTile> {
-  late Subject s;
-  @override
-  void initState() {
-    super.initState();
-    s = widget.subject;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final nf = NumberFormat("0.##");
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(s.name, style: const TextStyle(fontWeight: FontWeight.w800)),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text("Coeff ${s.coeff}"),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            ...s.parts.asMap().entries.map((e) {
-              final i = e.key; final p = e.value;
-              return Row(
-                children: [
-                  Expanded(child: Text(p.label)),
-                  SizedBox(
-                    width: 72,
-                    child: TextField(
-                      controller: TextEditingController(text: nf.format(p.weight * 100)),
-                      decoration: const InputDecoration(suffixText: "%"),
-                      keyboardType: TextInputType.number,
-                      onSubmitted: (v) {
-                        final d = double.tryParse(v.replaceAll(',', '.')) ?? (p.weight * 100);
-                        setState(() { p.weight = (d.clamp(0, 100)) / 100.0; });
-                        widget.onChanged(s);
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 72,
-                    child: TextField(
-                      controller: TextEditingController(text: nf.format(p.score)),
-                      decoration: const InputDecoration(suffixText: "/20"),
-                      keyboardType: TextInputType.number,
-                      onSubmitted: (v) {
-                        final d = double.tryParse(v.replaceAll(',', '.')) ?? p.score;
-                        setState(() { p.score = d.clamp(0, 20); });
-                        widget.onChanged(s);
-                      },
-                    ),
-                  ),
-                ],
-              );
-            }),
-            const SizedBox(height: 6),
-            if (s.eliminatory)
-              Row(
-                children: [
-                  const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                  const SizedBox(width: 6),
-                  Text("مادة إقصائية • العتبة ${s.eliminatoryThreshold}"),
-                ],
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-// ======================= Fachub (main.dart) — FIXED (Part 2/3) =======================
-// ChatScreen + UI widgets + NewChannelDialog
 
 // ------------------------------ Chat Screen ----------------------------------
 
@@ -1054,112 +1007,138 @@ class _NewChannelDialogState extends State<_NewChannelDialog> {
     );
   }
 }
-// ======================= Fachub (main.dart) — FIXED (Part 3/3) =======================
-// Templates + SettingsScreenPro (presets + JSON import/export)
+// ======================= Fachub (main.dart) — FULL with Offline→Online Sync (Part 3/3) =======================
 
-// ------------------------------ Templates ------------------------------------
+// ------------------------------ GPA SCREEN -----------------------------------
+class GPAScreen extends StatefulWidget {
+  final TermData term;
+  final ValueChanged<TermData> onUpdate;
+  const GPAScreen({super.key, required this.term, required this.onUpdate});
 
-TermData templateDZ_CS_S1() {
-  return TermData(
-    label: "S1 CS (DZ) 2025/2026",
-    system: const TermSystem(passThreshold: 10.0, hasResit: true, roundTo: 2),
-    subjects: [
-      Subject(
-        id: "cs_math",
-        name: "Math Analysis",
-        coeff: 4,
-        eliminatory: false,
-        parts: [
-          SubjectPart(label: "TD",   weight: 0.3, score: 0),
-          SubjectPart(label: "EXAM", weight: 0.7, score: 0),
-        ],
-      ),
-      Subject(
-        id: "cs_algo",
-        name: "Algorithms",
-        coeff: 3,
-        eliminatory: true,
-        eliminatoryThreshold: 7.0,
-        parts: [
-          SubjectPart(label: "TD",   weight: 0.4, score: 0),
-          SubjectPart(label: "EXAM", weight: 0.6, score: 0),
-        ],
-      ),
-      Subject(
-        id: "cs_arch",
-        name: "Computer Architecture",
-        coeff: 2,
-        eliminatory: false,
-        parts: [
-          SubjectPart(label: "TP",   weight: 0.4, score: 0),
-          SubjectPart(label: "EXAM", weight: 0.6, score: 0),
-        ],
-      ),
-      Subject(
-        id: "cs_eng",
-        name: "English",
-        coeff: 1,
-        eliminatory: false,
-        parts: [
-          SubjectPart(label: "CC",   weight: 0.4, score: 0),
-          SubjectPart(label: "EXAM", weight: 0.6, score: 0),
-        ],
-      ),
-    ],
-  );
+  @override
+  State<GPAScreen> createState() => _GPAScreenState();
 }
 
-TermData templateEconomics_S1() {
-  return TermData(
-    label: "S1 Economics 2025/2026",
-    system: const TermSystem(passThreshold: 10.0, hasResit: true, roundTo: 2),
-    subjects: [
-      Subject(
-        id: "eco_micro",
-        name: "Microeconomics",
-        coeff: 3,
-        eliminatory: false,
-        parts: [
-          SubjectPart(label: "TD",   weight: 0.3, score: 0),
-          SubjectPart(label: "EXAM", weight: 0.7, score: 0),
-        ],
-      ),
-      Subject(
-        id: "eco_stat",
-        name: "Statistics",
-        coeff: 3,
-        eliminatory: false,
-        parts: [
-          SubjectPart(label: "TD",   weight: 0.4, score: 0),
-          SubjectPart(label: "EXAM", weight: 0.6, score: 0),
-        ],
-      ),
-      Subject(
-        id: "eco_acc",
-        name: "Accounting",
-        coeff: 2,
-        eliminatory: false,
-        parts: [
-          SubjectPart(label: "TP",   weight: 0.5, score: 0),
-          SubjectPart(label: "EXAM", weight: 0.5, score: 0),
-        ],
-      ),
-      Subject(
-        id: "eco_law",
-        name: "Business Law",
-        coeff: 2,
-        eliminatory: false,
-        parts: [
-          SubjectPart(label: "CC",   weight: 0.4, score: 0),
-          SubjectPart(label: "EXAM", weight: 0.6, score: 0),
-        ],
-      ),
-    ],
-  );
+class _GPAScreenState extends State<GPAScreen> {
+  late TermData _term;
+
+  @override
+  void initState() {
+    super.initState();
+    _term = widget.term.copy();
+  }
+
+  void _updateSubject(Subject s, int partIndex, double newScore) {
+    setState(() {
+      s.parts[partIndex].score = newScore;
+    });
+    widget.onUpdate(_term.copy());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final avg = termAverage(_term);
+    final passed = avg >= _term.system.passThreshold;
+    return ListView(
+      padding: const EdgeInsets.all(14),
+      children: [
+        Card(
+          elevation: 0.2,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.school_outlined, color: kFachubBlue),
+                    const SizedBox(width: 8),
+                    Text(_term.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                    const Spacer(),
+                    Text(
+                      "${avg.toStringAsFixed(_term.system.roundTo)} / 20",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: passed ? kFachubGreen : Colors.redAccent,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        ..._term.subjects.map((s) => _SubjectCard(s: s, onPartEdit: _updateSubject)).toList(),
+      ],
+    );
+  }
 }
 
-// --------------------------- Settings (Advanced) ------------------------------
+class _SubjectCard extends StatelessWidget {
+  final Subject s;
+  final void Function(Subject s, int partIndex, double newScore) onPartEdit;
+  const _SubjectCard({required this.s, required this.onPartEdit});
 
+  @override
+  Widget build(BuildContext context) {
+    final avg = s.average();
+    final color = avg >= (s.eliminatory ? s.eliminatoryThreshold : 0)
+        ? kFachubBlue
+        : Colors.redAccent;
+    return Card(
+      elevation: 0.2,
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                Text("Coef ${s.coeff}"),
+                const SizedBox(width: 12),
+                Text(avg.toStringAsFixed(2), style: TextStyle(color: color, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const Divider(),
+            Column(
+              children: List.generate(s.parts.length, (i) {
+                final p = s.parts[i];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(p.label)),
+                      SizedBox(
+                        width: 60,
+                        child: TextFormField(
+                          initialValue: p.score.toStringAsFixed(1),
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(isDense: true),
+                          onChanged: (v) {
+                            final val = double.tryParse(v) ?? p.score;
+                            onPartEdit(s, i, val.clamp(0, 20));
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text("x${(p.weight * 100).toInt()}%"),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// --------------------------- SETTINGS & PRESETS ------------------------------
 class SettingsScreenPro extends StatefulWidget {
   final TermData term;
   final ValueChanged<TermData> onApplyTerm;
@@ -1203,26 +1182,6 @@ class _SettingsScreenProState extends State<SettingsScreenPro> {
     final map = encodeTerm(_local);
     final jsonStr = const JsonEncoder.withIndent('  ').convert(map);
     await Clipboard.setData(ClipboardData(text: jsonStr));
-    await showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Export JSON"),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(child: SelectableText(jsonStr)),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Close")),
-          ElevatedButton(
-            onPressed: () {
-              Clipboard.setData(ClipboardData(text: jsonStr));
-              Navigator.pop(context);
-            },
-            child: const Text("Copy"),
-          ),
-        ],
-      ),
-    );
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text("تم نسخ JSON إلى الحافظة")),
     );
@@ -1327,11 +1286,6 @@ class _SettingsScreenProState extends State<SettingsScreenPro> {
                     _PresetButton(label: "Reset Sample", onTap: () => _applyTemplate(sampleTerm())),
                   ],
                 ),
-                const SizedBox(height: 6),
-                const Text(
-                  "اختر قالب كبداية حسب تخصصك، ويمكنك تعديل المواد والمعاملات من شاشة الحاسبة.",
-                  style: TextStyle(color: Colors.grey),
-                ),
               ],
             ),
           ),
@@ -1345,14 +1299,15 @@ class _SettingsScreenProState extends State<SettingsScreenPro> {
               children: [
                 const Text("Backup / Restore", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
-                Row(
+                Wrap( // ✅ لتفادي overflow
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     ElevatedButton.icon(
                       onPressed: _exportJSON,
                       icon: const Icon(Icons.download_outlined),
                       label: const Text("Export JSON"),
                     ),
-                    const SizedBox(width: 8),
                     OutlinedButton.icon(
                       onPressed: _importJSON,
                       icon: const Icon(Icons.upload_outlined),
@@ -1360,21 +1315,8 @@ class _SettingsScreenProState extends State<SettingsScreenPro> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                const Text(
-                  "التصدير/الاستيراد يتم عبر النسخ واللصق (Clipboard). لاحقًا نضيف تخزين ملفات أو سحابة.",
-                  style: TextStyle(color: Colors.grey),
-                ),
               ],
             ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Card(
-          child: ListTile(
-            title: const Text("About Fachub"),
-            subtitle: const Text("حساب المعدّل + شات الطلاب • نسخة Firebase-ready"),
-            trailing: const Icon(Icons.info_outline),
           ),
         ),
       ],
@@ -1392,3 +1334,34 @@ class _PresetButton extends StatelessWidget {
     return OutlinedButton(onPressed: onTap, child: Text(label));
   }
 }
+
+// ------------------------------ TEMPLATES ------------------------------------
+TermData templateDZ_CS_S1() => TermData(
+  label: "S1 CS (DZ)",
+  system: const TermSystem(passThreshold: 10, hasResit: true, roundTo: 2),
+  subjects: [
+    Subject(id: "math", name: "Math", coeff: 4, eliminatory: true, eliminatoryThreshold: 7, parts: [
+      SubjectPart(label: "TD", weight: 0.3, score: 0),
+      SubjectPart(label: "EXAM", weight: 0.7, score: 0),
+    ]),
+    Subject(id: "algo", name: "Algorithms", coeff: 3, eliminatory: true, eliminatoryThreshold: 7, parts: [
+      SubjectPart(label: "TP", weight: 0.4, score: 0),
+      SubjectPart(label: "EXAM", weight: 0.6, score: 0),
+    ]),
+  ],
+);
+
+TermData templateEconomics_S1() => TermData(
+  label: "S1 Economics",
+  system: const TermSystem(passThreshold: 10, hasResit: true, roundTo: 2),
+  subjects: [
+    Subject(id: "eco", name: "Microeconomics", coeff: 3, eliminatory: false, parts: [
+      SubjectPart(label: "TD", weight: 0.4, score: 0),
+      SubjectPart(label: "EXAM", weight: 0.6, score: 0),
+    ]),
+    Subject(id: "stat", name: "Statistics", coeff: 3, eliminatory: false, parts: [
+      SubjectPart(label: "TD", weight: 0.5, score: 0),
+      SubjectPart(label: "EXAM", weight: 0.5, score: 0),
+    ]),
+  ],
+);
