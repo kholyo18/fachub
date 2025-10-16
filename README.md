@@ -1,6 +1,9 @@
 <p align="center">
   <img src="assets/brand/logo-horizontal.svg" width="720" alt="Fachub Logo"/>
 </p>
+<p align="center">
+  <img src="assets/screenshots/fachub_mockup.png" width="720" alt="Fachub App Preview"/>
+</p>
 
 # Fachub 🎓💬
 حساب المعدّل الجامعي + شات طلابي (Online عبر Firebase أو Offline محليًا).  
