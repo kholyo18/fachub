@@ -1,7 +1,8 @@
-// ======================= Fachub (main.dart) — FULL with Offline→Online Sync (Part 1/3) =======================
+// ======================= Fachub (main.dart) — FINAL (Part 1/3) =======================
 
 // ------------------------------- IMPORTS -------------------------------------
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -12,7 +13,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 // Firebase (يشتغل فقط إذا فعلت flutterfire ووجد firebase_options.dart)
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'firebase_options.dart';
+
+// اختيار ملفات
+// import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
+import 'package:path_provider/path_provider.dart';
+
 
 // ------------------------------- CONSTS --------------------------------------
 const kFachubGreen = Color(0xFF16A34A);
@@ -64,10 +72,10 @@ class TermSystem {
   const TermSystem({required this.passThreshold, required this.hasResit, required this.roundTo});
 
   TermSystem copyWith({double? passThreshold, bool? hasResit, int? roundTo}) => TermSystem(
-    passThreshold: passThreshold ?? this.passThreshold,
-    hasResit: hasResit ?? this.hasResit,
-    roundTo: roundTo ?? this.roundTo,
-  );
+        passThreshold: passThreshold ?? this.passThreshold,
+        hasResit: hasResit ?? this.hasResit,
+        roundTo: roundTo ?? this.roundTo,
+      );
 }
 
 class SubjectPart {
@@ -78,10 +86,10 @@ class SubjectPart {
 
   Map<String, dynamic> toMap() => {'label': label, 'weight': weight, 'score': score};
   factory SubjectPart.fromMap(Map<String, dynamic> m) => SubjectPart(
-    label: m['label'] ?? '',
-    weight: (m['weight'] ?? 0).toDouble(),
-    score: (m['score'] ?? 0).toDouble(),
-  );
+        label: m['label'] ?? '',
+        weight: (m['weight'] ?? 0).toDouble(),
+        score: (m['score'] ?? 0).toDouble(),
+      );
 }
 
 class Subject {
@@ -110,22 +118,24 @@ class Subject {
   }
 
   Map<String, dynamic> toMap() => {
-    'id': id,
-    'name': name,
-    'coeff': coeff,
-    'eliminatory': eliminatory,
-    'eliminatoryThreshold': eliminatoryThreshold,
-    'parts': parts.map((e) => e.toMap()).toList(),
-  };
+        'id': id,
+        'name': name,
+        'coeff': coeff,
+        'eliminatory': eliminatory,
+        'eliminatoryThreshold': eliminatoryThreshold,
+        'parts': parts.map((e) => e.toMap()).toList(),
+      };
 
   factory Subject.fromMap(Map<String, dynamic> m) => Subject(
-    id: m['id'] ?? '',
-    name: m['name'] ?? '',
-    coeff: (m['coeff'] ?? 0).toInt(),
-    eliminatory: (m['eliminatory'] ?? false) as bool,
-    eliminatoryThreshold: (m['eliminatoryThreshold'] ?? 0).toDouble(),
-    parts: (m['parts'] as List? ?? const []).map((e) => SubjectPart.fromMap(Map<String, dynamic>.from(e))).toList(),
-  );
+        id: m['id'] ?? '',
+        name: m['name'] ?? '',
+        coeff: (m['coeff'] ?? 0).toInt(),
+        eliminatory: (m['eliminatory'] ?? false) as bool,
+        eliminatoryThreshold: (m['eliminatoryThreshold'] ?? 0).toDouble(),
+        parts: (m['parts'] as List? ?? const [])
+            .map((e) => SubjectPart.fromMap(Map<String, dynamic>.from(e)))
+            .toList(),
+      );
 }
 
 class TermData {
@@ -136,35 +146,49 @@ class TermData {
   TermData({required this.label, required this.system, required this.subjects});
 
   TermData copy() => TermData(
-    label: label,
-    system: TermSystem(passThreshold: system.passThreshold, hasResit: system.hasResit, roundTo: system.roundTo),
-    subjects: subjects.map((s) => Subject(
-      id: s.id,
-      name: s.name,
-      coeff: s.coeff,
-      eliminatory: s.eliminatory,
-      eliminatoryThreshold: s.eliminatoryThreshold,
-      parts: s.parts.map((p) => SubjectPart(label: p.label, weight: p.weight, score: p.score)).toList(),
-    )).toList(),
-  );
+        label: label,
+        system: TermSystem(
+            passThreshold: system.passThreshold,
+            hasResit: system.hasResit,
+            roundTo: system.roundTo),
+        subjects: subjects
+            .map(
+              (s) => Subject(
+                id: s.id,
+                name: s.name,
+                coeff: s.coeff,
+                eliminatory: s.eliminatory,
+                eliminatoryThreshold: s.eliminatoryThreshold,
+                parts: s.parts
+                    .map((p) => SubjectPart(label: p.label, weight: p.weight, score: p.score))
+                    .toList(),
+              ),
+            )
+            .toList(),
+      );
 }
 
 // ترميز/فك JSON للحفظ/التبادل
 Map<String, dynamic> encodeTerm(TermData t) => {
-  'label': t.label,
-  'system': {'passThreshold': t.system.passThreshold, 'hasResit': t.system.hasResit, 'roundTo': t.system.roundTo},
-  'subjects': t.subjects.map((s) => s.toMap()).toList(),
-};
+      'label': t.label,
+      'system': {
+        'passThreshold': t.system.passThreshold,
+        'hasResit': t.system.hasResit,
+        'roundTo': t.system.roundTo
+      },
+      'subjects': t.subjects.map((s) => s.toMap()).toList(),
+    };
 
 TermData decodeTerm(Map<String, dynamic> m) => TermData(
-  label: m['label'] ?? 'Term',
-  system: TermSystem(
-    passThreshold: (m['system']?['passThreshold'] ?? 10).toDouble(),
-    hasResit: (m['system']?['hasResit'] ?? true) as bool,
-    roundTo: (m['system']?['roundTo'] ?? 2).toInt(),
-  ),
-  subjects: (m['subjects'] as List? ?? const []).map((e) => Subject.fromMap(Map<String, dynamic>.from(e))).toList(),
-);
+      label: m['label'] ?? 'Term',
+      system: TermSystem(
+        passThreshold: (m['system']?['passThreshold'] ?? 10).toDouble(),
+        hasResit: (m['system']?['hasResit'] ?? true) as bool,
+        roundTo: (m['system']?['roundTo'] ?? 2).toInt(),
+      ),
+      subjects:
+          (m['subjects'] as List? ?? const []).map((e) => Subject.fromMap(Map<String, dynamic>.from(e))).toList(),
+    );
 
 // ----------------------------- GPA FUNCTIONS ---------------------------------
 double subjectWeighted(Subject s) => s.average() * s.coeff;
@@ -186,42 +210,42 @@ double termAverage(TermData t) {
 
 // ------------------------------ SAMPLE TERM ----------------------------------
 TermData sampleTerm() => TermData(
-  label: "Sample S1",
-  system: const TermSystem(passThreshold: 10.0, hasResit: true, roundTo: 2),
-  subjects: [
-    Subject(
-      id: "math",
-      name: "Mathematics",
-      coeff: 4,
-      eliminatory: true,
-      eliminatoryThreshold: 7.0,
-      parts: [
-        SubjectPart(label: "TD", weight: 0.3, score: 0),
-        SubjectPart(label: "EXAM", weight: 0.7, score: 0),
+      label: "Sample S1",
+      system: const TermSystem(passThreshold: 10.0, hasResit: true, roundTo: 2),
+      subjects: [
+        Subject(
+          id: "math",
+          name: "Mathematics",
+          coeff: 4,
+          eliminatory: true,
+          eliminatoryThreshold: 7.0,
+          parts: [
+            SubjectPart(label: "TD", weight: 0.3, score: 0),
+            SubjectPart(label: "EXAM", weight: 0.7, score: 0),
+          ],
+        ),
+        Subject(
+          id: "cs",
+          name: "Computer Science",
+          coeff: 3,
+          eliminatory: false,
+          parts: [
+            SubjectPart(label: "TP", weight: 0.4, score: 0),
+            SubjectPart(label: "EXAM", weight: 0.6, score: 0),
+          ],
+        ),
+        Subject(
+          id: "eng",
+          name: "English",
+          coeff: 1,
+          eliminatory: false,
+          parts: [
+            SubjectPart(label: "CC", weight: 0.4, score: 0),
+            SubjectPart(label: "EXAM", weight: 0.6, score: 0),
+          ],
+        ),
       ],
-    ),
-    Subject(
-      id: "cs",
-      name: "Computer Science",
-      coeff: 3,
-      eliminatory: false,
-      parts: [
-        SubjectPart(label: "TP", weight: 0.4, score: 0),
-        SubjectPart(label: "EXAM", weight: 0.6, score: 0),
-      ],
-    ),
-    Subject(
-      id: "eng",
-      name: "English",
-      coeff: 1,
-      eliminatory: false,
-      parts: [
-        SubjectPart(label: "CC", weight: 0.4, score: 0),
-        SubjectPart(label: "EXAM", weight: 0.6, score: 0),
-      ],
-    ),
-  ],
-);
+    );
 
 // ------------------------------ STORAGE LAYER --------------------------------
 abstract class IDataStore {
@@ -270,11 +294,19 @@ class PendingMessage {
   final String text;
   final DateTime time;
 
+  // مرفقات (اختيارية عند الإرسال Offline)
+  final String? localPath;
+  final String? fileName;
+  final String? mimeType;
+
   PendingMessage({
     required this.channelId,
     required this.sender,
     required this.text,
     required this.time,
+    this.localPath,
+    this.fileName,
+    this.mimeType,
   });
 
   Map<String, dynamic> toMap() => {
@@ -282,6 +314,9 @@ class PendingMessage {
         'sender': sender,
         'text': text,
         'time': time.toIso8601String(),
+        'localPath': localPath,
+        'fileName': fileName,
+        'mimeType': mimeType,
       };
 
   factory PendingMessage.fromMap(Map<String, dynamic> m) => PendingMessage(
@@ -289,6 +324,9 @@ class PendingMessage {
         sender: (m['sender'] ?? '') as String,
         text: (m['text'] ?? '') as String,
         time: DateTime.tryParse((m['time'] ?? '') as String) ?? DateTime.now(),
+        localPath: m['localPath'] as String?,
+        fileName: m['fileName'] as String?,
+        mimeType: m['mimeType'] as String?,
       );
 }
 
@@ -345,7 +383,12 @@ class LocalStore implements IDataStore {
   ];
   final Map<String, List<ChatMessage>> _msgs = {
     "general": [
-      ChatMessage(id: "m1", channelId: "general", sender: "System", text: "مرحبًا بك في Fachub (Offline).", time: DateTime.now()),
+      ChatMessage(
+          id: "m1",
+          channelId: "general",
+          sender: "System",
+          text: "مرحبًا بك في Fachub (Offline).",
+          time: DateTime.now()),
     ]
   };
 
@@ -369,7 +412,9 @@ class LocalStore implements IDataStore {
   @override
   Future<void> renameChannel(String id, String newName) async {
     final i = _chs.indexWhere((e) => e.id == id);
-    if (i >= 0) _chs[i] = ChatChannel(id: _chs[i].id, name: newName, isDM: _chs[i].isDM);
+    if (i >= 0) {
+      _chs[i] = ChatChannel(id: _chs[i].id, name: newName, isDM: _chs[i].isDM);
+    }
   }
 
   @override
@@ -383,7 +428,7 @@ class LocalStore implements IDataStore {
     yield _msgs[channelId]?.toList() ?? const <ChatMessage>[];
   }
 
-  // ✅ تعديل: إضافة الرسالة للواجهة + تخزين نسخة معلّقة لرفعها عند الاتصال
+  // إضافة الرسالة + تخزين نسخة معلّقة لرفعها عند الاتصال
   @override
   Future<void> sendMessage(String channelId, String text, {required String sender}) async {
     final list = _msgs.putIfAbsent(channelId, () => []);
@@ -397,7 +442,7 @@ class LocalStore implements IDataStore {
     );
     list.add(msg);
 
-    // خزّن نسخة معلّقة لرفعها لاحقاً إلى Firebase
+    // خزّن نسخة معلّقة (بدون مرفق هنا — المرفقات تُحفظ من شاشة الشات)
     await PendingQueue.push(PendingMessage(
       channelId: channelId,
       sender: sender,
@@ -434,7 +479,11 @@ class FirebaseStore implements IDataStore {
     return db.collection('channels').orderBy('name').snapshots().map((snap) {
       return snap.docs.map((d) {
         final m = d.data();
-        return ChatChannel(id: d.id, name: (m['name'] ?? d.id).toString(), isDM: (m['isDM'] ?? false) as bool);
+        return ChatChannel(
+          id: d.id,
+          name: (m['name'] ?? d.id).toString(),
+          isDM: (m['isDM'] ?? false) as bool,
+        );
       }).toList();
     });
   }
@@ -461,22 +510,23 @@ class FirebaseStore implements IDataStore {
 
   @override
   Stream<List<ChatMessage>> messages(String channelId) {
-    return db.collection('messages')
-      .where('channelId', isEqualTo: channelId)
-      .orderBy('createdAt')
-      .snapshots()
-      .map((snap) => snap.docs.map((d) {
-            final m = d.data();
-            return ChatMessage(
-              id: d.id,
-              channelId: (m['channelId'] ?? '') as String,
-              sender: (m['sender'] ?? 'Unknown') as String,
-              text: (m['text'] ?? '') as String,
-              time: (m['createdAt'] is Timestamp)
-                  ? (m['createdAt'] as Timestamp).toDate()
-                  : DateTime.now(),
-            );
-          }).toList());
+    return db
+        .collection('messages')
+        .where('channelId', isEqualTo: channelId)
+        .orderBy('createdAt')
+        .snapshots()
+        .map((snap) => snap.docs.map((d) {
+              final m = d.data();
+              return ChatMessage(
+                id: d.id,
+                channelId: (m['channelId'] ?? '') as String,
+                sender: (m['sender'] ?? 'Unknown') as String,
+                text: (m['text'] ?? '') as String,
+                time: (m['createdAt'] is Timestamp)
+                    ? (m['createdAt'] as Timestamp).toDate()
+                    : DateTime.now(),
+              );
+            }).toList());
   }
 
   @override
@@ -507,13 +557,12 @@ class FirebaseStore implements IDataStore {
     }
   }
 }
-// ======================= Fachub (main.dart) — FULL with Offline→Online Sync (Part 2/3) =======================
+// ======================= Fachub (main.dart) — FINAL (Part 2/3) =======================
 
 // ------------------------------ SYNC MANAGER ----------------------------------
-// يقرأ الرسائل المعلقة من SharedPreferences ويرفعها لـ Firestore عند الاتصال
+// يرفع الرسائل المعلّقة (والملفات) إلى Firebase عندما يتوفر الإنترنت
 class SyncManager {
   final FirebaseStore firebase;
-
   SyncManager({required this.firebase});
 
   Future<int> flushPending() async {
@@ -521,9 +570,26 @@ class SyncManager {
     if (pending.isEmpty) return 0;
 
     for (final p in pending) {
-      await firebase.sendMessage(p.channelId, p.text, sender: p.sender);
-      // وقت الرسالة في Firestore سيكون serverTimestamp (مناسب للترتيب)
+      String textToSend = p.text;
+
+      // لو عندنا مرفق محفوظ محليًا — ارفعه ثم أرسل الرابط
+      if (p.localPath != null &&
+          p.localPath!.isNotEmpty &&
+          File(p.localPath!).existsSync()) {
+        final file = File(p.localPath!);
+        final name = p.fileName ?? file.uri.pathSegments.last;
+        final ref = FirebaseStorage.instance
+            .ref()
+            .child('uploads/${p.channelId}/${DateTime.now().millisecondsSinceEpoch}_$name');
+
+        await ref.putFile(file);
+        final url = await ref.getDownloadURL();
+        textToSend = "📎 $name\n$url";
+      }
+
+      await firebase.sendMessage(p.channelId, textToSend, sender: p.sender);
     }
+
     await PendingQueue.clear();
     return pending.length;
   }
@@ -549,15 +615,14 @@ class _HomeShellState extends State<HomeShell> {
     store = widget.isOnline ? FirebaseStore() : LocalStore();
     _loadTerm();
 
-    // ➜ لو Online حالياً، اعمل مزامنة للرسائل المعلقة
+    // مزامنة الرسائل المعلّقة عند الاتصال
     if (widget.isOnline && store is FirebaseStore) {
       final sync = SyncManager(firebase: store as FirebaseStore);
       sync.flushPending().then((n) {
-        if (n > 0 && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("تمت مزامنة $n رسالة معلّقة إلى السحابة")),
-          );
-        }
+        if (!mounted || n <= 0) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("تمت مزامنة $n رسالة معلّقة إلى السحابة")),
+        );
       });
     }
   }
@@ -635,6 +700,12 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _showOnlyDMs = false;
   final TextEditingController _composer = TextEditingController();
   final ScrollController _scroll = ScrollController();
+
+  // لوحة إيموجي بسيطة
+  final List<String> _emojis = [
+    "😀","😁","😂","🤣","😊","😍","😘","😎","🤩",
+    "👍","👏","🙏","🔥","💯","🎉","✅","❗","❓",
+  ];
 
   @override
   void dispose() {
@@ -725,6 +796,87 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  // فتح لوحة الإيموجي
+  void _openEmojiPicker() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (_) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Wrap(
+              spacing: 10, runSpacing: 10,
+              children: _emojis.map((e) => InkWell(
+                onTap: () {
+                  _composer.text = _composer.text + (_composer.text.isEmpty ? "" : " ") + e;
+                  _composer.selection = TextSelection.fromPosition(
+                    TextPosition(offset: _composer.text.length),
+                  );
+                  Navigator.pop(context);
+                },
+                child: Container(
+                  width: 44, height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    color: Colors.grey.shade100,
+                  ),
+                  child: Text(e, style: const TextStyle(fontSize: 22)),
+                ),
+              )).toList(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // إرفاق ملف: Online يرفع إلى Firebase Storage، Offline يخزن في PendingQueue
+  Future<void> _attachFile() async {
+    if (_current == null) return;
+
+    final res = await FilePicker.platform.pickFiles(withReadStream: false);
+    if (res == null || res.files.isEmpty) return;
+
+    final file = res.files.single;
+    final path = file.path;
+    final name = file.name;
+    final mime = file.extension;
+
+    if (path == null) return;
+
+    if (widget.isOnline) {
+      try {
+        final ref = FirebaseStorage.instance
+            .ref()
+            .child('uploads/${_current!.id}/${DateTime.now().millisecondsSinceEpoch}_$name');
+        await ref.putFile(File(path));
+        final url = await ref.getDownloadURL();
+
+        await widget.store.sendMessage(_current!.id, "📎 $name\n$url", sender: "Khaled");
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل الرفع: $e")));
+      }
+    } else {
+      // Offline: خزّن في قائمة الانتظار فقط + أعلم المستخدم
+      await PendingQueue.push(PendingMessage(
+        channelId: _current!.id,
+        sender: "Khaled",
+        text: "📎 $name (سيتم رفعه عند الاتصال)",
+        time: DateTime.now(),
+        localPath: path,
+        fileName: name,
+        mimeType: mime,
+      ));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("تمت إضافة المرفق إلى قائمة الانتظار (Offline)")),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -793,10 +945,8 @@ class _ChatScreenState extends State<ChatScreen> {
         // محرّر الإرسال
         _ComposerBar(
           controller: _composer,
-          onAttach: () {
-            _composer.text = (_composer.text + (_composer.text.isEmpty ? "" : " ")) + "[attachment]";
-            _composer.selection = TextSelection.fromPosition(TextPosition(offset: _composer.text.length));
-          },
+          onAttach: _attachFile,
+          onEmoji: _openEmojiPicker,
           onSend: _send,
         ),
       ],
@@ -866,7 +1016,13 @@ class _ComposerBar extends StatelessWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
   final VoidCallback onAttach;
-  const _ComposerBar({required this.controller, required this.onSend, required this.onAttach});
+  final VoidCallback onEmoji;
+  const _ComposerBar({
+    required this.controller,
+    required this.onSend,
+    required this.onAttach,
+    required this.onEmoji,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -876,7 +1032,7 @@ class _ComposerBar extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
         child: Row(
           children: [
-            IconButton(tooltip: "إرفاق (تجريبي)", onPressed: onAttach, icon: const Icon(Icons.attach_file)),
+            IconButton(tooltip: "إرفاق", onPressed: onAttach, icon: const Icon(Icons.attach_file)),
             Expanded(
               child: TextField(
                 controller: controller,
@@ -885,10 +1041,7 @@ class _ComposerBar extends StatelessWidget {
                 decoration: InputDecoration(
                   hintText: "اكتب رسالة…",
                   suffixIcon: IconButton(
-                    onPressed: () {
-                      controller.text = controller.text + " 😀";
-                      controller.selection = TextSelection.fromPosition(TextPosition(offset: controller.text.length));
-                    },
+                    onPressed: onEmoji,
                     icon: const Icon(Icons.emoji_emotions_outlined),
                   ),
                 ),
@@ -987,7 +1140,7 @@ class _NewChannelDialogState extends State<_NewChannelDialog> {
           ),
           const SizedBox(height: 4),
           const Text(
-            "ملاحظة: عند الربط مع Firebase سيتم حفظ القناة والرسائل في السحابة.",
+            "عند الربط مع Firebase سيتم حفظ القناة والرسائل في السحابة.",
             style: TextStyle(color: Colors.grey, fontSize: 12),
           ),
         ],
@@ -1007,7 +1160,7 @@ class _NewChannelDialogState extends State<_NewChannelDialog> {
     );
   }
 }
-// ======================= Fachub (main.dart) — FULL with Offline→Online Sync (Part 3/3) =======================
+// ======================= Fachub (main.dart) — FINAL (Part 3/3) =======================
 
 // ------------------------------ GPA SCREEN -----------------------------------
 class GPAScreen extends StatefulWidget {
@@ -1029,9 +1182,7 @@ class _GPAScreenState extends State<GPAScreen> {
   }
 
   void _updateSubject(Subject s, int partIndex, double newScore) {
-    setState(() {
-      s.parts[partIndex].score = newScore;
-    });
+    setState(() => s.parts[partIndex].score = newScore.clamp(0, 20));
     widget.onUpdate(_term.copy());
   }
 
@@ -1046,30 +1197,26 @@ class _GPAScreenState extends State<GPAScreen> {
           elevation: 0.2,
           child: Padding(
             padding: const EdgeInsets.all(14),
-            child: Column(
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.school_outlined, color: kFachubBlue),
-                    const SizedBox(width: 8),
-                    Text(_term.label, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    const Spacer(),
-                    Text(
-                      "${avg.toStringAsFixed(_term.system.roundTo)} / 20",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
-                        color: passed ? kFachubGreen : Colors.redAccent,
-                      ),
-                    ),
-                  ],
+                const Icon(Icons.school_outlined, color: kFachubBlue),
+                const SizedBox(width: 8),
+                Text(_term.label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                const Spacer(),
+                Text(
+                  "${avg.toStringAsFixed(_term.system.roundTo)} / 20",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: passed ? kFachubGreen : Colors.redAccent,
+                  ),
                 ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 8),
-        ..._term.subjects.map((s) => _SubjectCard(s: s, onPartEdit: _updateSubject)).toList(),
+        ..._term.subjects.map((s) => _SubjectCard(s: s, onPartEdit: _updateSubject)),
       ],
     );
   }
@@ -1083,9 +1230,10 @@ class _SubjectCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final avg = s.average();
-    final color = avg >= (s.eliminatory ? s.eliminatoryThreshold : 0)
-        ? kFachubBlue
-        : Colors.redAccent;
+    final color = s.eliminatory && avg < s.eliminatoryThreshold
+        ? Colors.redAccent
+        : kFachubBlue;
+
     return Card(
       elevation: 0.2,
       margin: const EdgeInsets.only(bottom: 8),
@@ -1113,14 +1261,14 @@ class _SubjectCard extends StatelessWidget {
                     children: [
                       Expanded(child: Text(p.label)),
                       SizedBox(
-                        width: 60,
+                        width: 64,
                         child: TextFormField(
                           initialValue: p.score.toStringAsFixed(1),
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
                           decoration: const InputDecoration(isDense: true),
                           onChanged: (v) {
-                            final val = double.tryParse(v) ?? p.score;
-                            onPartEdit(s, i, val.clamp(0, 20));
+                            final val = double.tryParse(v.replaceAll(',', '.')) ?? p.score;
+                            onPartEdit(s, i, val);
                           },
                         ),
                       ),
@@ -1240,15 +1388,21 @@ class _SettingsScreenProState extends State<SettingsScreenPro> {
                   children: [
                     _PresetButton(
                       label: "DZ Default",
-                      onTap: () => _applySystemPreset(_local.system.copyWith(passThreshold: 10.0, hasResit: true, roundTo: 2)),
+                      onTap: () => _applySystemPreset(
+                        _local.system.copyWith(passThreshold: 10.0, hasResit: true, roundTo: 2),
+                      ),
                     ),
                     _PresetButton(
                       label: "Strict 12",
-                      onTap: () => _applySystemPreset(_local.system.copyWith(passThreshold: 12.0, hasResit: false, roundTo: 2)),
+                      onTap: () => _applySystemPreset(
+                        _local.system.copyWith(passThreshold: 12.0, hasResit: false, roundTo: 2),
+                      ),
                     ),
                     _PresetButton(
                       label: "Rounded 1dp",
-                      onTap: () => _applySystemPreset(_local.system.copyWith(roundTo: 1)),
+                      onTap: () => _applySystemPreset(
+                        _local.system.copyWith(roundTo: 1),
+                      ),
                     ),
                   ],
                 ),
@@ -1299,7 +1453,7 @@ class _SettingsScreenProState extends State<SettingsScreenPro> {
               children: [
                 const Text("Backup / Restore", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
-                Wrap( // ✅ لتفادي overflow
+                Wrap( // ✅ يمنع overflow على الشاشات الصغيرة
                   spacing: 8,
                   runSpacing: 8,
                   children: [
