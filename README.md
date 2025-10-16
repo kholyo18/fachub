@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/brand/logo-horizontal.svg" width="720" alt="Fachub Logo"/>
+</p>
+
 # Fachub 🎓💬
 حساب المعدّل الجامعي + شات طلابي (Online عبر Firebase أو Offline محليًا).  
 تطبيق Flutter بالألوان الأساسية **أخضر** `#16A34A` و **أزرق** `#2563EB`.
