@@ -1,16 +1,44 @@
-# fachub
+# Fachub 🎓💬
+حساب المعدّل الجامعي + شات طلابي (Online عبر Firebase أو Offline محليًا).  
+تطبيق Flutter بالألوان الأساسية **أخضر** `#16A34A` و **أزرق** `#2563EB`.
 
-A new Flutter project.
+![Platform](https://img.shields.io/badge/Flutter-3.x-blue)
+![Firebase](https://img.shields.io/badge/Firebase-Core%20%7C%20Auth%20%7C%20Firestore%20%7C%20Messaging-ffca28)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## Getting Started
+> التطبيق يشتغل حتى بدون إعداد Firebase (وضع Offline)، وعند تفعيل Firebase ينتقل تلقائيًا إلى وضع Online.
 
-This project is a starting point for a Flutter application.
+---
 
-A few resources to get you started if this is your first Flutter project:
+## ✨ المزايا
+- 🧮 **حاسبة المعدّل**: مواد / معاملات / أجزاء (TD/TP/EXAM) + استدراك + مواد إقصائية + تقريب.
+- 💬 **شات طلابي**: قنوات/DM، إرسال رسائل، يعمل:
+    - **Online**: Firestore (إن وُجدت إعدادات Firebase).
+    - **Offline**: LocalStore (ذاكرة + حفظ تلقائي).
+- 🧩 **قوالب جاهزة** للتخصصات + **تعديل سريع** للإعدادات.
+- 💾 **حفظ تلقائي** للـ TermData عبر `shared_preferences`.
+- 🔁 **تصدير/استيراد JSON** من داخل التطبيق (Clipboard).
+- 🔔 تهيئة **Firebase Messaging** (Snackbar في المقدمة لتجارب أولية).
+- 📄 (اختياري) توليد PDF لاحقًا عند تفعيل حزمتَي `pdf` و `printing`.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+---
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## 📦 المتطلبات
+- Flutter 3.22+
+- Dart SDK 3.4+
+- JDK 17
+- Android SDK (compile/target 34)
+
+---
+
+## 🚀 التشغيل السريع
+```bash
+# 1) جلب الحزم
+flutter pub get
+
+# 2) (اختياري) ربط Firebase تلقائيًا لجميع المنصات التي تريدها
+dart pub global activate flutterfire_cli
+flutterfire configure   # يولّد lib/firebase_options.dart
+
+# 3) تشغيل
+flutter run   # اختر جهاز Android أو Web
