@@ -579,7 +579,7 @@ class _SettingsDzScreenState extends State<SettingsDzScreen> {
     if (path == null) return;
     final xf = XFile.fromData(Uint8List.fromList(utf8.encode(jsonStr)),
         name: '$name.json', mimeType: 'application/json');
-    await xf.saveTo(path);
+    await xf.saveToFile(path);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم التصدير كـ JSON')));
     }
