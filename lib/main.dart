@@ -575,7 +575,7 @@ class _SettingsDzScreenState extends State<SettingsDzScreen> {
     final name = (entry['name'] as String).replaceAll(RegExp(r'[^\w\-\s]'), '_');
     final jsonStr = const JsonEncoder.withIndent('  ').convert(tMap);
 
-    final path = await getSavePath(suggestedName: '$name.json');
+    final path = await getSaveLocation(suggestedName: '$name.json');
     if (path == null) return;
     final xf = XFile.fromData(Uint8List.fromList(utf8.encode(jsonStr)),
         name: '$name.json', mimeType: 'application/json');
@@ -2011,7 +2011,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             itemBuilder: (_, i) {
               final m = jsonDecode(drafts[i]) as Map<String, dynamic>;
               return ListTile(
-                title: Text((m['text'] as String?)?.take(80) ?? ''),
+                title: Text(((m['text'] ?? '') as String).takeSafe(80)),
                 subtitle: Text(m['time'] ?? ''),
                 trailing: Text((m['tags'] ?? '').toString()),
                 onTap: () {
