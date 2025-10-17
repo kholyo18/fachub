@@ -2,7 +2,7 @@
 // Fachub — main.dart (FULL INTEGRATION) — PART 1/5
 // كل الأجزاء تُلصق تباعاً في نفس الملف وبالترتيب.
 // ============================================================================
-
+import 'dart:io';
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
@@ -576,12 +576,18 @@ class _SettingsDzScreenState extends State<SettingsDzScreen> {
     final jsonStr = const JsonEncoder.withIndent('  ').convert(tMap);
 
     final path = await getSaveLocation(suggestedName: '$name.json');
-    if (path == null) return;
-    final xf = XFile.fromData(Uint8List.fromList(utf8.encode(jsonStr)),
-        name: '$name.json', mimeType: 'application/json');
-    await xf.saveToFile(path);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم التصدير كـ JSON')));
+    final loc = await getSaveLocation(suggestedName: '$name.json');
+    if (loc == null) return;
+
+    final file = File(loc.path);
+    await file.writeAsString(jsonStr);
+
+   if (mounted) {
+     ScaffoldMessenger.of(context).showSnackBar(
+       const SnackBar(content: Text('تم حفظ القالب بنجاح ✅')),
+     );
+   }
+
     }
   }
 
