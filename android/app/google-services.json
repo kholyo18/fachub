@@ -1,73 +1,26 @@
 {
   "project_info": {
-    "project_number": "1049778610899",
-    "project_id": "one-second-world",
-    "storage_bucket": "one-second-world.firebasestorage.app"
+    "project_number": "696673984351",
+    "project_id": "fachub-c631c",
+    "storage_bucket": "fachub-c631c.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1049778610899:android:fb5049c7d41de568d36a26",
-        "android_client_info": {
-          "package_name": "com.example.one_second_world"
-        }
-      },
-      "oauth_client": [
-        {
-          "client_id": "1049778610899-h6inuugtafpddl9ne9pvmpji52sq0cqe.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.one_second_world",
-            "certificate_hash": "637a347f6f3f6559d79c0d7126290a158e254e17"
-          }
-        },
-        {
-          "client_id": "1049778610899-v3mlnv1tq65hpgt14r8rmatgril9hpsb.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
-      "api_key": [
-        {
-          "current_key": "AIzaSyANCfiCxn7ox56PKYekBk4G8R7L5hyAJQI"
-        }
-      ],
-      "services": {
-        "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "1049778610899-v3mlnv1tq65hpgt14r8rmatgril9hpsb.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
-        }
-      }
-    },
-    {
-      "client_info": {
-        "mobilesdk_app_id": "1:1049778610899:android:3d86018ebbb47b95d36a26",
+        "mobilesdk_app_id": "1:696673984351:android:fd697b78707ee3472360ea",
         "android_client_info": {
           "package_name": "dz.fachub.fachub"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "1049778610899-v3mlnv1tq65hpgt14r8rmatgril9hpsb.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyANCfiCxn7ox56PKYekBk4G8R7L5hyAJQI"
+          "current_key": "AIzaSyABaqWKk3wwyFtcRbUpIw2jMfQUtwrU0GM"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "1049778610899-v3mlnv1tq65hpgt14r8rmatgril9hpsb.apps.googleusercontent.com",
-              "client_type": 3
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

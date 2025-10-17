@@ -50,20 +50,21 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyD5vOqmi1Y_LV9OxgQagJsgrCkR5oFQ1Qs',
-    appId: '1:1049778610899:web:75ed965b15b3b678d36a26',
-    messagingSenderId: '1049778610899',
-    projectId: 'one-second-world',
-    authDomain: 'one-second-world.firebaseapp.com',
-    storageBucket: 'one-second-world.firebasestorage.app',
-    measurementId: 'G-VRWPVCJC8L',
+    apiKey: 'AIzaSyDEcAuIneLFI77f-_pM7tqXhtDNV5P9kcs',
+    appId: '1:696673984351:web:d60aeaebcd68c5cf2360ea',
+    messagingSenderId: '696673984351',
+    projectId: 'fachub-c631c',
+    authDomain: 'fachub-c631c.firebaseapp.com',
+    storageBucket: 'fachub-c631c.firebasestorage.app',
+    measurementId: 'G-VMC4E5NE50',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyANCfiCxn7ox56PKYekBk4G8R7L5hyAJQI',
-    appId: '1:1049778610899:android:3d86018ebbb47b95d36a26',
-    messagingSenderId: '1049778610899',
-    projectId: 'one-second-world',
-    storageBucket: 'one-second-world.firebasestorage.app',
+    apiKey: 'AIzaSyABaqWKk3wwyFtcRbUpIw2jMfQUtwrU0GM',
+    appId: '1:696673984351:android:fd697b78707ee3472360ea',
+    messagingSenderId: '696673984351',
+    projectId: 'fachub-c631c',
+    storageBucket: 'fachub-c631c.firebasestorage.app',
   );
+
 }
