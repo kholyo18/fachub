@@ -1,0 +1,38 @@
+{
+  "title": "LANG_EN • L3 S2",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "Linguistics 2",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "Literature 2",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "Speaking 2",
+      "coef": 2,
+      "weights": {
+        "CC": 60,
+        "EXAM": 40
+      }
+    },
+    {
+      "name": "ICT 2",
+      "coef": 2,
+      "weights": {
+        "CC": 60,
+        "EXAM": 40
+      }
+    }
+  ]
+}

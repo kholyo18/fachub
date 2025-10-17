@@ -1,0 +1,38 @@
+{
+  "title": "GESTION • L1 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "مالية",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "محاسبة",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "قانون",
+      "coef": 2,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "تواصل",
+      "coef": 2,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    }
+  ]
+}

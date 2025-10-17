@@ -1,0 +1,38 @@
+{
+  "title": "LANG_FR • M1 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "Grammaire 1",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "Civilisation 1",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "orale 1",
+      "coef": 2,
+      "weights": {
+        "CC": 60,
+        "EXAM": 40
+      }
+    },
+    {
+      "name": "Méthodologie 1",
+      "coef": 2,
+      "weights": {
+        "CC": 60,
+        "EXAM": 40
+      }
+    }
+  ]
+}

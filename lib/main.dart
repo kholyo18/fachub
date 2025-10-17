@@ -1,1282 +1,2471 @@
-// ======================= Fachub (main.dart) — FINAL (Part 1/3) =======================
+// ============================================================================
+// Fachub — main.dart (FULL INTEGRATION) — PART 1/5
+// كل الأجزاء تُلصق تباعاً في نفس الملف وبالترتيب.
+// ============================================================================
 
-// ------------------------------- IMPORTS -------------------------------------
 import 'dart:convert';
-import 'dart:io';
-import 'dart:math' as math;
-
+import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
-// Firebase (يشتغل فقط إذا فعلت flutterfire ووجد firebase_options.dart)
+// Firebase
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+
+// Local & Files
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_selector/file_selector.dart';
+
+// PDF & Printing
+import 'package:pdf/widgets.dart' as pw;
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
+
+// خيارات Firebase التي أنشأتها عبر flutterfire
 import 'firebase_options.dart';
 
-// اختيار ملفات (بديل file_picker)
-// import 'package:file_picker/file_picker.dart';
-import 'package:file_selector/file_selector.dart';
-import 'package:path_provider/path_provider.dart';
+// ============================================================================
+// ألوان وهوية الواجهة
+// ============================================================================
+const kFachubGreen = Color(0xFF16434A);
+const kFachubBlue  = Color(0xFF2365EB);
 
-// ------------------------------- CONSTS --------------------------------------
-const kFachubGreen = Color(0xFF16A34A);
-const kFachubBlue  = Color(0xFF2563EB);
-
-// ------------------------------- ENTRY ---------------------------------------
+// ============================================================================
+// تشغيل التطبيق
+// ============================================================================
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  bool firebaseOK = false;
-  try {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-    firebaseOK = true;
-  } catch (_) {
-    firebaseOK = false; // يشتغل Offline تلقائياً
-  }
-  runApp(FachubApp(isOnline: firebaseOK));
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(const FachubApp());
 }
 
+// ============================================================================
+// واجهة التطبيق
+// ============================================================================
 class FachubApp extends StatelessWidget {
-  final bool isOnline;
-  const FachubApp({super.key, required this.isOnline});
+  const FachubApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final base = ColorScheme.fromSeed(seedColor: kFachubBlue, brightness: Brightness.light);
     return MaterialApp(
       title: 'Fachub',
-      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: base,
-        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black87,
-          elevation: 0.2,
-        ),
+        colorSchemeSeed: kFachubBlue,
+        fontFamily: 'Roboto',
       ),
-      home: HomeShell(isOnline: isOnline),
-    );
-  }
-}
-
-// ----------------------------- DATA MODELS -----------------------------------
-class TermSystem {
-  final double passThreshold;
-  final bool hasResit;
-  final int roundTo;
-  const TermSystem({required this.passThreshold, required this.hasResit, required this.roundTo});
-
-  TermSystem copyWith({double? passThreshold, bool? hasResit, int? roundTo}) => TermSystem(
-        passThreshold: passThreshold ?? this.passThreshold,
-        hasResit: hasResit ?? this.hasResit,
-        roundTo: roundTo ?? this.roundTo,
-      );
-}
-
-class SubjectPart {
-  String label;
-  double weight; // 0..1
-  double score;  // 0..20
-  SubjectPart({required this.label, required this.weight, required this.score});
-
-  Map<String, dynamic> toMap() => {'label': label, 'weight': weight, 'score': score};
-  factory SubjectPart.fromMap(Map<String, dynamic> m) => SubjectPart(
-        label: m['label'] ?? '',
-        weight: (m['weight'] ?? 0).toDouble(),
-        score: (m['score'] ?? 0).toDouble(),
-      );
-}
-
-class Subject {
-  String id;
-  String name;
-  int coeff;
-  bool eliminatory;
-  double eliminatoryThreshold;
-  List<SubjectPart> parts;
-
-  Subject({
-    required this.id,
-    required this.name,
-    required this.coeff,
-    required this.eliminatory,
-    this.eliminatoryThreshold = 0.0,
-    required this.parts,
-  });
-
-  double average() {
-    double s = 0;
-    for (final p in parts) {
-      s += p.weight * p.score;
-    }
-    return s;
-  }
-
-  Map<String, dynamic> toMap() => {
-        'id': id,
-        'name': name,
-        'coeff': coeff,
-        'eliminatory': eliminatory,
-        'eliminatoryThreshold': eliminatoryThreshold,
-        'parts': parts.map((e) => e.toMap()).toList(),
-      };
-
-  factory Subject.fromMap(Map<String, dynamic> m) => Subject(
-        id: m['id'] ?? '',
-        name: m['name'] ?? '',
-        coeff: (m['coeff'] ?? 0).toInt(),
-        eliminatory: (m['eliminatory'] ?? false) as bool,
-        eliminatoryThreshold: (m['eliminatoryThreshold'] ?? 0).toDouble(),
-        parts: (m['parts'] as List? ?? const [])
-            .map((e) => SubjectPart.fromMap(Map<String, dynamic>.from(e)))
-            .toList(),
-      );
-}
-
-class TermData {
-  String label;
-  TermSystem system;
-  List<Subject> subjects;
-
-  TermData({required this.label, required this.system, required this.subjects});
-
-  TermData copy() => TermData(
-        label: label,
-        system: TermSystem(
-            passThreshold: system.passThreshold,
-            hasResit: system.hasResit,
-            roundTo: system.roundTo),
-        subjects: subjects
-            .map(
-              (s) => Subject(
-                id: s.id,
-                name: s.name,
-                coeff: s.coeff,
-                eliminatory: s.eliminatory,
-                eliminatoryThreshold: s.eliminatoryThreshold,
-                parts: s.parts
-                    .map((p) => SubjectPart(label: p.label, weight: p.weight, score: p.score))
-                    .toList(),
-              ),
-            )
-            .toList(),
-      );
-}
-
-// ترميز/فك JSON للحفظ/التبادل
-Map<String, dynamic> encodeTerm(TermData t) => {
-      'label': t.label,
-      'system': {
-        'passThreshold': t.system.passThreshold,
-        'hasResit': t.system.hasResit,
-        'roundTo': t.system.roundTo
-      },
-      'subjects': t.subjects.map((s) => s.toMap()).toList(),
-    };
-
-TermData decodeTerm(Map<String, dynamic> m) => TermData(
-      label: m['label'] ?? 'Term',
-      system: TermSystem(
-        passThreshold: (m['system']?['passThreshold'] ?? 10).toDouble(),
-        hasResit: (m['system']?['hasResit'] ?? true) as bool,
-        roundTo: (m['system']?['roundTo'] ?? 2).toInt(),
-      ),
-      subjects:
-          (m['subjects'] as List? ?? const []).map((e) => Subject.fromMap(Map<String, dynamic>.from(e))).toList(),
-    );
-
-// ----------------------------- GPA FUNCTIONS ---------------------------------
-double subjectWeighted(Subject s) => s.average() * s.coeff;
-
-double termAverage(TermData t) {
-  // شرط الإقصاء
-  for (final s in t.subjects) {
-    if (s.eliminatory && s.average() < s.eliminatoryThreshold) {
-      return 0.0;
-    }
-  }
-  final coeffSum = t.subjects.fold<int>(0, (a, b) => a + b.coeff);
-  if (coeffSum == 0) return 0.0;
-  final sum = t.subjects.fold<double>(0, (a, b) => a + subjectWeighted(b));
-  final avg = sum / coeffSum;
-  final factor = math.pow(10, t.system.roundTo).toDouble();
-  return (avg * factor).round() / factor;
-}
-
-// ------------------------------ SAMPLE TERM ----------------------------------
-TermData sampleTerm() => TermData(
-      label: "Sample S1",
-      system: const TermSystem(passThreshold: 10.0, hasResit: true, roundTo: 2),
-      subjects: [
-        Subject(
-          id: "math",
-          name: "Mathematics",
-          coeff: 4,
-          eliminatory: true,
-          eliminatoryThreshold: 7.0,
-          parts: [
-            SubjectPart(label: "TD", weight: 0.3, score: 0),
-            SubjectPart(label: "EXAM", weight: 0.7, score: 0),
-          ],
-        ),
-        Subject(
-          id: "cs",
-          name: "Computer Science",
-          coeff: 3,
-          eliminatory: false,
-          parts: [
-            SubjectPart(label: "TP", weight: 0.4, score: 0),
-            SubjectPart(label: "EXAM", weight: 0.6, score: 0),
-          ],
-        ),
-        Subject(
-          id: "eng",
-          name: "English",
-          coeff: 1,
-          eliminatory: false,
-          parts: [
-            SubjectPart(label: "CC", weight: 0.4, score: 0),
-            SubjectPart(label: "EXAM", weight: 0.6, score: 0),
-          ],
-        ),
+      debugShowCheckedModeBanner: false,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
       ],
+      supportedLocales: const [Locale('ar'), Locale('en')],
+      home: const AuthGate(),
     );
-
-// ------------------------------ STORAGE LAYER --------------------------------
-abstract class IDataStore {
-  // chat
-  Stream<List<ChatChannel>> channels();
-  Future<ChatChannel> createChannel(String name, {bool isDM = false});
-  Future<void> renameChannel(String id, String newName);
-  Future<void> deleteChannel(String id);
-  Stream<List<ChatMessage>> messages(String channelId);
-  Future<void> sendMessage(String channelId, String text, {required String sender});
-
-  // term
-  Future<void> saveTerm(TermData t);
-  Future<TermData> loadTerm();
+  }
 }
 
-// ------------------------------ CHAT MODELS ----------------------------------
-class ChatChannel {
-  final String id;
+// ============================================================================
+// بوابة المصادقة
+// ============================================================================
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (ctx, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (!snap.hasData) return const SignInScreen();
+        return const HomeTabs();
+      },
+    );
+  }
+}
+
+// ============================================================================
+// شاشة الدخول/التسجيل (بسيطة)
+// ============================================================================
+class SignInScreen extends StatefulWidget {
+  const SignInScreen({super.key});
+  @override
+  State<SignInScreen> createState() => _SignInScreenState();
+}
+
+class _SignInScreenState extends State<SignInScreen> {
+  final email = TextEditingController();
+  final password = TextEditingController();
+  bool loading = false;
+
+  Future<void> _login() async {
+    setState(() => loading = true);
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email.text.trim(), password: password.text.trim());
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+    } finally { setState(() => loading = false); }
+  }
+
+  Future<void> _register() async {
+    setState(() => loading = true);
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email.text.trim(), password: password.text.trim());
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل التسجيل: $e')));
+    } finally { setState(() => loading = false); }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade100,
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Card(
+            elevation: 3,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.school_rounded, color: kFachubBlue, size: 64),
+                const SizedBox(height: 12),
+                const Text("مرحبًا بك في Fachub",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: email,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.email_outlined), labelText: "البريد الإلكتروني"),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: password, obscureText: true,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.lock_outline), labelText: "كلمة المرور"),
+                ),
+                const SizedBox(height: 20),
+                Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                  FilledButton.icon(
+                    onPressed: loading ? null : _login,
+                    icon: const Icon(Icons.login), label: const Text("دخول")),
+                  OutlinedButton.icon(
+                    onPressed: loading ? null : _register,
+                    icon: const Icon(Icons.person_add_alt), label: const Text("تسجيل")),
+                ]),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// نماذج/قوالب DZ + التخزين المحلي + الفهرس + مزامنة Firestore + هوية الشهادة
+// ============================================================================
+
+// ----------------------------- DzSubject/DzTemplate --------------------------
+class DzSubject {
   final String name;
-  final bool isDM;
-  const ChatChannel({required this.id, required this.name, required this.isDM});
-  ChatChannel copy() => ChatChannel(id: id, name: name, isDM: isDM);
+  final double coef;
+  final Map<String, double> weights; // {"TD":30,"EXAM":70} مئوية
+
+  DzSubject({required this.name, required this.coef, required this.weights});
+
+  factory DzSubject.fromMap(Map<String, dynamic> m) => DzSubject(
+        name: m['name'] as String,
+        coef: (m['coef'] as num).toDouble(),
+        weights: (m['weights'] as Map<String, dynamic>)
+            .map((k, v) => MapEntry(k.toString(), (v as num).toDouble())),
+      );
+
+  Map<String, dynamic> toMap() => {'name': name, 'coef': coef, 'weights': weights};
 }
 
-class ChatMessage {
-  final String id;
-  final String channelId;
-  final String sender;
-  final String text;
-  final DateTime time;
-  const ChatMessage({
-    required this.id,
-    required this.channelId,
-    required this.sender,
-    required this.text,
-    required this.time,
-  });
-}
+class DzTemplate {
+  final String title;
+  final double successThreshold;
+  final List<DzSubject> subjects;
 
-// ------------------------------ PENDING QUEUE ---------------------------------
-// تخزين الرسائل غير المرسلة محلياً حتى تتوفر الشبكة ثم نرفعها لـ Firebase
-class PendingMessage {
-  final String channelId;
-  final String sender;
-  final String text;
-  final DateTime time;
+  DzTemplate({required this.title, required this.successThreshold, required this.subjects});
 
-  // مرفقات (اختيارية عند الإرسال Offline)
-  final String? localPath;
-  final String? fileName;
-  final String? mimeType;
-
-  PendingMessage({
-    required this.channelId,
-    required this.sender,
-    required this.text,
-    required this.time,
-    this.localPath,
-    this.fileName,
-    this.mimeType,
-  });
+  factory DzTemplate.fromMap(Map<String, dynamic> m) => DzTemplate(
+        title: (m['title'] ?? '') as String,
+        successThreshold: (m['success_threshold'] as num?)?.toDouble() ?? 10.0,
+        subjects: ((m['subjects'] as List?) ?? const [])
+            .cast<Map<String, dynamic>>().map((e) => DzSubject.fromMap(e)).toList(),
+      );
 
   Map<String, dynamic> toMap() => {
-        'channelId': channelId,
-        'sender': sender,
-        'text': text,
-        'time': time.toIso8601String(),
-        'localPath': localPath,
-        'fileName': fileName,
-        'mimeType': mimeType,
+        'title': title,
+        'success_threshold': successThreshold,
+        'subjects': subjects.map((s) => s.toMap()).toList(),
       };
-
-  factory PendingMessage.fromMap(Map<String, dynamic> m) => PendingMessage(
-        channelId: (m['channelId'] ?? '') as String,
-        sender: (m['sender'] ?? '') as String,
-        text: (m['text'] ?? '') as String,
-        time: DateTime.tryParse((m['time'] ?? '') as String) ?? DateTime.now(),
-        localPath: m['localPath'] as String?,
-        fileName: m['fileName'] as String?,
-        mimeType: m['mimeType'] as String?,
-      );
 }
 
-class PendingQueue {
-  static const _key = 'fachub_pending_msgs_v1';
-
-  // أضف رسالة إلى قائمة الانتظار
-  static Future<void> push(PendingMessage msg) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    final List list = raw == null ? [] : (json.decode(raw) as List);
-    list.add(msg.toMap());
-    await prefs.setString(_key, json.encode(list));
-  }
-
-  // استرجاع كل الرسائل المعلقة
-  static Future<List<PendingMessage>> all() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null) return [];
-    try {
-      final List list = json.decode(raw) as List;
-      return list.map((e) => PendingMessage.fromMap(Map<String, dynamic>.from(e))).toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  // تفريغ (بعد الرفع)
-  static Future<void> clear() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_key);
-  }
-
-  // عدد الرسائل المعلقة (اختياري للواجهة)
-  static Future<int> count() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null) return 0;
-    try {
-      final List list = json.decode(raw) as List;
-      return list.length;
-    } catch (_) {
-      return 0;
-    }
-  }
+/// تحويل DzTemplate إلى شكل المواد المستعمل في شاشة الحاسبة
+List<Map<String, dynamic>> dzTemplateToCalculatorModel(DzTemplate t) {
+  return t.subjects.map((dz) {
+    final m = <String, dynamic>{
+      'name': dz.name,
+      'coef': dz.coef,
+      'weights': dz.weights,
+    };
+    if (dz.weights.containsKey('TD')) m['td'] = 0.0;
+    if (dz.weights.containsKey('TP')) m['tp'] = 0.0;
+    if (dz.weights.containsKey('CC')) m['cc'] = 0.0;
+    if (dz.weights.containsKey('EXAM')) m['exam'] = 0.0;
+    return m;
+  }).toList();
 }
 
-// ------------------------------ LOCAL STORE ----------------------------------
-class LocalStore implements IDataStore {
-  final _chs = <ChatChannel>[
-    const ChatChannel(id: "general", name: "General", isDM: false),
-    const ChatChannel(id: "dm_alice", name: "Alice", isDM: true),
-  ];
-  final Map<String, List<ChatMessage>> _msgs = {
-    "general": [
-      ChatMessage(
-          id: "m1",
-          channelId: "general",
-          sender: "System",
-          text: "مرحبًا بك في Fachub (Offline).",
-          time: DateTime.now()),
-    ]
-  };
+// ----------------------------- Built-in Catalog ------------------------------
+Future<Map<String, Map<String, String>>> dzLoadIndex(BuildContext ctx) async {
+  final txt = await DefaultAssetBundle.of(ctx).loadString('assets/templates_dz/index.json');
+  final m = jsonDecode(txt) as Map<String, dynamic>;
+  final majors = (m['majors'] as Map<String, dynamic>);
+  return majors.map((maj, semsAny) {
+    final sems = (semsAny as Map<String, dynamic>)
+        .map((k, v) => MapEntry(k, v.toString()));
+    return MapEntry(maj, Map<String, String>.from(sems));
+  });
+}
 
-  // term local (SharedPreferences)
-  static const _prefsKey = "fachub_term_v1";
+Future<DzTemplate> dzLoadBuiltInTemplateByFile(BuildContext ctx, String filename) async {
+  final txt = await DefaultAssetBundle.of(ctx).loadString('assets/templates_dz/$filename');
+  return DzTemplate.fromMap(jsonDecode(txt));
+}
 
-  @override
-  Stream<List<ChatChannel>> channels() async* {
-    yield _chs.map((c) => c).toList().cast<ChatChannel>();
-  }
+// --------------------------- CalculatorSubjectsIO ----------------------------
+class CalculatorSubjectsIO {
+  static const _k = 'calc_subjects_v2';
+  static const _kThreshold = 'calc_threshold_v2';
 
-  @override
-  Future<ChatChannel> createChannel(String name, {bool isDM = false}) async {
-    final id = (isDM ? "dm_" : "c_") + name.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '').toLowerCase();
-    final c = ChatChannel(id: id, name: name, isDM: isDM);
-    _chs.add(c);
-    _msgs.putIfAbsent(id, () => []);
-    return c;
-  }
-
-  @override
-  Future<void> renameChannel(String id, String newName) async {
-    final i = _chs.indexWhere((e) => e.id == id);
-    if (i >= 0) {
-      _chs[i] = ChatChannel(id: _chs[i].id, name: newName, isDM: _chs[i].isDM);
-    }
-  }
-
-  @override
-  Future<void> deleteChannel(String id) async {
-    _chs.removeWhere((e) => e.id == id);
-    _msgs.remove(id);
-  }
-
-  @override
-  Stream<List<ChatMessage>> messages(String channelId) async* {
-    yield _msgs[channelId]?.toList() ?? const <ChatMessage>[];
-  }
-
-  // إضافة الرسالة + تخزين نسخة معلّقة لرفعها عند الاتصال
-  @override
-  Future<void> sendMessage(String channelId, String text, {required String sender}) async {
-    final list = _msgs.putIfAbsent(channelId, () => []);
-    final now = DateTime.now();
-    final msg = ChatMessage(
-      id: now.millisecondsSinceEpoch.toString(),
-      channelId: channelId,
-      sender: sender,
-      text: text,
-      time: now,
-    );
-    list.add(msg);
-
-    // خزّن نسخة معلّقة (بدون مرفق هنا — المرفقات تُحفظ من شاشة الشات)
-    await PendingQueue.push(PendingMessage(
-      channelId: channelId,
-      sender: sender,
-      text: text,
-      time: now,
-    ));
-  }
-
-  @override
-  Future<void> saveTerm(TermData t) async {
+  static Future<void> setSubjects(List<Map<String, dynamic>> subjects, {double? threshold}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsKey, jsonEncode(encodeTerm(t)));
+    await prefs.setString(_k, jsonEncode(subjects));
+    if (threshold != null) await prefs.setDouble(_kThreshold, threshold);
   }
 
-  @override
-  Future<TermData> loadTerm() async {
+  static Future<List<Map<String, dynamic>>?> getSubjects() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_prefsKey);
-    if (raw == null) return sampleTerm();
-    try {
-      return decodeTerm(jsonDecode(raw));
-    } catch (_) {
-      return sampleTerm();
-    }
+    final str = prefs.getString(_k);
+    if (str == null) return null;
+    return (jsonDecode(str) as List).cast<Map<String, dynamic>>();
+  }
+
+  static Future<double?> getThreshold() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble(_kThreshold);
   }
 }
 
-// ------------------------------ FIREBASE STORE -------------------------------
-class FirebaseStore implements IDataStore {
-  final FirebaseFirestore db = FirebaseFirestore.instance;
+// --------------------------- Custom Templates (Local) ------------------------
+class DzCustomTemplatesStore {
+  static const _key = 'dz_custom_templates_v1';
 
-  @override
-  Stream<List<ChatChannel>> channels() {
-    return db.collection('channels').orderBy('name').snapshots().map((snap) {
-      return snap.docs.map((d) {
-        final m = d.data();
-        return ChatChannel(
-          id: d.id,
-          name: (m['name'] ?? d.id).toString(),
-          isDM: (m['isDM'] ?? false) as bool,
-        );
-      }).toList();
-    });
-  }
-
-  @override
-  Future<ChatChannel> createChannel(String name, {bool isDM = false}) async {
-    final doc = await db.collection('channels').add({
+  static Future<void> saveCustom(DzTemplate t, {required String name}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList(_key) ?? <String>[];
+    final filtered = raw
+        .map((s) => jsonDecode(s))
+        .where((m) => (m['name'] as String?) != name)
+        .map((m) => jsonEncode(m))
+        .toList();
+    filtered.add(jsonEncode({
       'name': name,
-      'isDM': isDM,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    return ChatChannel(id: doc.id, name: name, isDM: isDM);
+      'template': t.toMap(),
+      'saved_at': DateTime.now().toIso8601String(),
+    }));
+    await prefs.setStringList(_key, filtered);
   }
 
-  @override
-  Future<void> renameChannel(String id, String newName) async {
-    await db.collection('channels').doc(id).update({'name': newName});
-  }
-
-  @override
-  Future<void> deleteChannel(String id) async {
-    await db.collection('channels').doc(id).delete();
-  }
-
-  @override
-  Stream<List<ChatMessage>> messages(String channelId) {
-    return db
-        .collection('messages')
-        .where('channelId', isEqualTo: channelId)
-        .orderBy('createdAt')
-        .snapshots()
-        .map((snap) => snap.docs.map((d) {
-              final m = d.data();
-              return ChatMessage(
-                id: d.id,
-                channelId: (m['channelId'] ?? '') as String,
-                sender: (m['sender'] ?? 'Unknown') as String,
-                text: (m['text'] ?? '') as String,
-                time: (m['createdAt'] is Timestamp)
-                    ? (m['createdAt'] as Timestamp).toDate()
-                    : DateTime.now(),
-              );
-            }).toList());
-  }
-
-  @override
-  Future<void> sendMessage(String channelId, String text, {required String sender}) async {
-    await db.collection('messages').add({
-      'channelId': channelId,
-      'sender': sender,
-      'text': text,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  @override
-  Future<void> saveTerm(TermData t) async {
+  static Future<List<Map<String, dynamic>>> listCustom() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(LocalStore._prefsKey, jsonEncode(encodeTerm(t)));
+    final raw = prefs.getStringList(_key) ?? <String>[];
+    return raw.map((s) => jsonDecode(s) as Map<String, dynamic>).toList();
   }
 
-  @override
-  Future<TermData> loadTerm() async {
+  static Future<void> deleteCustomByName(String name) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(LocalStore._prefsKey);
-    if (raw == null) return sampleTerm();
-    try {
-      return decodeTerm(jsonDecode(raw));
-    } catch (_) {
-      return sampleTerm();
+    final raw = prefs.getStringList(_key) ?? <String>[];
+    final filtered = raw
+        .map((s) => jsonDecode(s))
+        .where((m) => (m['name'] as String?) != name)
+        .map((m) => jsonEncode(m))
+        .toList();
+    await prefs.setStringList(_key, filtered);
+  }
+}
+
+// --------------------------- Firestore Sync (Custom) -------------------------
+class DzCustomTemplatesSync {
+  static CollectionReference<Map<String, dynamic>> _col(String uid) =>
+      FirebaseFirestore.instance
+          .collection('users').doc(uid).collection('dz_custom_templates')
+          .withConverter<Map<String, dynamic>>(
+            fromFirestore: (snap, _) => snap.data() ?? {},
+            toFirestore: (m, _) => m,
+          );
+
+  static Future<void> uploadAllCustom() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw 'يرجى تسجيل الدخول أولًا';
+    final list = await DzCustomTemplatesStore.listCustom();
+    final col = _col(user.uid);
+    final batch = FirebaseFirestore.instance.batch();
+    for (final e in list) {
+      final name = (e['name'] as String).trim();
+      final t = e['template'] as Map<String, dynamic>;
+      final ref = col.doc(name);
+      batch.set(ref, {
+        'name': name,
+        'template': t,
+        'updated_at': FieldValue.serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+
+  static Future<void> downloadAllToLocal() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) throw 'يرجى تسجيل الدخول أولًا';
+    final snaps = await _col(user.uid).get();
+    for (final d in snaps.docs) {
+      final m = d.data();
+      final t = DzTemplate.fromMap((m['template'] as Map).cast<String, dynamic>());
+      await DzCustomTemplatesStore.saveCustom(t, name: m['name'] as String);
     }
   }
 }
-// ======================= Fachub (main.dart) — FINAL (Part 2/3) =======================
 
-// ------------------------------ SYNC MANAGER ----------------------------------
-class SyncManager {
-  final FirebaseStore firebase;
-  SyncManager({required this.firebase});
+// --------------------------- شهادة PDF: هوية وتخزين -------------------------
+class CertificateIdentityStore {
+  static const _kName = 'cert_student_name';
+  static const _kUni  = 'cert_university_name';
+  static const _kLogo = 'cert_university_logo_b64';
 
-  Future<int> flushPending() async {
-    final pending = await PendingQueue.all();
-    if (pending.isEmpty) return 0;
+  static Future<void> saveName(String v) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kName, v);
+  }
+  static Future<void> saveUniversity(String v) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kUni, v);
+  }
+  static Future<void> saveLogoBytes(Uint8List? bytes) async {
+    final p = await SharedPreferences.getInstance();
+    if (bytes == null) { await p.remove(_kLogo); return; }
+    await p.setString(_kLogo, base64Encode(bytes));
+  }
 
-    for (final p in pending) {
-      var textToSend = p.text;
-
-      // لو فيه مرفق محلي، ارفعه ثم استبدل النص بالرابط
-      if (p.localPath != null &&
-          p.localPath!.isNotEmpty &&
-          File(p.localPath!).existsSync()) {
-        final file = File(p.localPath!);
-        final name = p.fileName ?? file.uri.pathSegments.last;
-        final ref = FirebaseStorage.instance
-            .ref()
-            .child('uploads/${p.channelId}/${DateTime.now().millisecondsSinceEpoch}_$name');
-        await ref.putFile(file);
-        final url = await ref.getDownloadURL();
-        textToSend = "📎 $name\n$url";
-      }
-
-      await firebase.sendMessage(p.channelId, textToSend, sender: p.sender);
-    }
-
-    await PendingQueue.clear();
-    return pending.length;
+  static Future<String?> getName() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(_kName);
+  }
+  static Future<String?> getUniversity() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(_kUni);
+  }
+  static Future<Uint8List?> getLogoBytes() async {
+    final p = await SharedPreferences.getInstance();
+    final s = p.getString(_kLogo);
+    if (s == null) return null;
+    try { return base64Decode(s); } catch (_) { return null; }
   }
 }
 
-// ------------------------------ HOME SHELL -----------------------------------
-class HomeShell extends StatefulWidget {
-  final bool isOnline;
-  const HomeShell({super.key, required this.isOnline});
+// ---------------------------- قوائم ثابتة + مساعدات -------------------------
+const Map<String, String> dzMajorsLabels = {
+  'informatique': 'إعلام آلي',
+  'mathematiques': 'رياضيات',
+  'physique': 'فيزياء',
+  'chimie': 'كيمياء',
+  'biologie': 'بيولوجيا',
+  'economie': 'اقتصاد',
+  'gestion': 'تسيير',
+  'comptabilite': 'محاسبة',
+  'droit': 'قانون',
+  'lang_arabe': 'لغة عربية',
+  'lang_fr': 'لغة فرنسية',
+  'lang_en': 'لغة إنجليزية',
+  'psychologie': 'علم النفس',
+};
 
-  @override
-  State<HomeShell> createState() => _HomeShellState();
+const List<String> dzYears     = ['L1', 'L2', 'L3', 'M1', 'M2'];
+const List<String> dzSemesters = ['S1', 'S2'];
+
+String dzBuildIndexKey(String year, String sem) => '${year}_${sem}';
+
+String dzNextSem(String year, String sem) {
+  final years = dzYears;
+  final sems  = dzSemesters;
+  int yi = years.indexOf(year);
+  int si = sems.indexOf(sem);
+  if (yi < 0 || si < 0) return '$year|$sem';
+  if (si == 0) return '${years[yi]}|S2';
+  if (yi + 1 < years.length) return '${years[yi+1]}|S1';
+  return '${years[yi]}|S2';
 }
 
-class _HomeShellState extends State<HomeShell> {
-  late final IDataStore store;
-  int _tab = 0;
-  TermData _term = sampleTerm();
+String dzPrevSem(String year, String sem) {
+  final years = dzYears;
+  final sems  = dzSemesters;
+  int yi = years.indexOf(year);
+  int si = sems.indexOf(sem);
+  if (yi < 0 || si < 0) return '$year|$sem';
+  if (si == 1) return '${years[yi]}|S1';
+  if (yi - 1 >= 0) return '${years[yi-1]}|S2';
+  return '${years[yi]}|S1';
+}
+
+// ============================================================================
+// يتبع في PART 2/5:
+// - شاشة الإعدادات (DZ) مع: القوائم المنسدلة + البحث الداخلي + إدارة القوالب
+//   (حفظ/استيراد/تصدير) + مزامنة Firestore + كارد هوية الشهادة (اسم/جامعة/شعار).
+// ============================================================================
+// ============================================================================
+// PART 2/5 — SettingsDzScreen: قوائم + بحث + حفظ/استيراد/تصدير + مزامنة + هوية PDF
+// ============================================================================
+
+class SettingsDzScreen extends StatefulWidget {
+  const SettingsDzScreen({super.key});
+  @override
+  State<SettingsDzScreen> createState() => _SettingsDzScreenState();
+}
+
+class _SettingsDzScreenState extends State<SettingsDzScreen> {
+  Map<String, Map<String, String>> _index = {};
+  bool _loadingIndex = true;
+
+  // اختيارات المستخدم
+  String _major = dzMajorsLabels.keys.first;
+  String _year = dzYears.first;          // L1
+  String _semester = dzSemesters.first;  // S1
+
+  String? _lastLoadedTitle;
+  String? _lastLoadedFile;
+
+  // بحث داخلي
+  final _searchCtrl = TextEditingController();
+  List<_BuiltInHit> _hits = [];
 
   @override
   void initState() {
     super.initState();
-    store = widget.isOnline ? FirebaseStore() : LocalStore();
-    _loadTerm();
+    _loadIndex();
+  }
 
-    if (widget.isOnline && store is FirebaseStore) {
-      final sync = SyncManager(firebase: store as FirebaseStore);
-      sync.flushPending().then((n) {
-        if (!mounted || n <= 0) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("تمت مزامنة $n رسالة معلّقة")),
-        );
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadIndex() async {
+    try {
+      final idx = await dzLoadIndex(context);
+      setState(() {
+        _index = idx;
+        _loadingIndex = false;
       });
+    } catch (e) {
+      setState(() => _loadingIndex = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('تعذر تحميل الفهرس: $e')));
+      }
     }
   }
 
-  Future<void> _loadTerm() async {
-    _term = await store.loadTerm();
+  Future<void> _loadBuiltIn() async {
+    if (_loadingIndex) return;
+    final key = dzBuildIndexKey(_year, _semester); // مثل L1_S1
+    final files = _index[_major];
+    if (files == null || !files.containsKey(key)) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('لا يوجد قالب: ${dzMajorsLabels[_major]} • $_year $_semester')));
+      return;
+    }
+    final file = files[key]!;
+    try {
+      final t = await dzLoadBuiltInTemplateByFile(context, file);
+      final list = dzTemplateToCalculatorModel(t);
+      await CalculatorSubjectsIO.setSubjects(list, threshold: t.successThreshold);
+      setState(() {
+        _lastLoadedTitle = t.title.isNotEmpty ? t.title : '${dzMajorsLabels[_major]} • $_year $_semester';
+        _lastLoadedFile = file;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحميل القالب إلى الحاسبة')));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل تحميل القالب: $e')));
+    }
+  }
+
+  Future<void> _saveAsCustom() async {
+    final subjects = await CalculatorSubjectsIO.getSubjects();
+    final threshold = await CalculatorSubjectsIO.getThreshold() ?? 10.0;
+    if (subjects == null || subjects.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('لا توجد مواد محمّلة في الحاسبة لحفظها كقالب')));
+      return;
+    }
+
+    final nameCtrl = TextEditingController(
+        text: _lastLoadedTitle ?? '${dzMajorsLabels[_major]} • $_year $_semester');
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('حفظ كقالب مخصّص'),
+        content: TextField(
+          controller: nameCtrl,
+          decoration: const InputDecoration(labelText: 'اسم القالب'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('حفظ')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+
+    // تحويل subjects (شكل الحاسبة) إلى DzTemplate
+    final dzSubs = subjects.map((m) {
+      final Map<String, double> weights =
+          (m['weights'] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toDouble())) ??
+          <String, double>{
+            if (m.containsKey('td')) 'TD': 30,
+            if (m.containsKey('tp')) 'TP': 40,
+            if (m.containsKey('cc')) 'CC': 40,
+            if (m.containsKey('exam')) 'EXAM': 60,
+          };
+      return DzSubject(
+        name: (m['name'] as String?) ?? 'مادة',
+        coef: ((m['coef'] as num?) ?? 1).toDouble(),
+        weights: weights,
+      );
+    }).toList();
+
+    final t = DzTemplate(
+      title: nameCtrl.text.trim(),
+      successThreshold: threshold,
+      subjects: dzSubs,
+    );
+
+    await DzCustomTemplatesStore.saveCustom(t, name: t.title);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحفظ كقالب مخصّص')));
+  }
+
+  Future<void> _exportCustomTemplate(Map<String, dynamic> entry) async {
+    final tMap = entry['template'] as Map<String, dynamic>;
+    final name = (entry['name'] as String).replaceAll(RegExp(r'[^\w\-\s]'), '_');
+    final jsonStr = const JsonEncoder.withIndent('  ').convert(tMap);
+
+    final path = await getSavePath(suggestedName: '$name.json');
+    if (path == null) return;
+    final xf = XFile.fromData(Uint8List.fromList(utf8.encode(jsonStr)),
+        name: '$name.json', mimeType: 'application/json');
+    await xf.saveTo(path);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم التصدير كـ JSON')));
+    }
+  }
+
+  Future<void> _importCustomTemplate() async {
+    final x = await openFile(acceptedTypeGroups: [
+      const XTypeGroup(label: 'json', extensions: ['json'])
+    ]);
+    if (x == null) return;
+    try {
+      final txt = await x.readAsString();
+      final m = jsonDecode(txt) as Map<String, dynamic>;
+      final t = DzTemplate.fromMap(m);
+      await DzCustomTemplatesStore.saveCustom(t, name: t.title);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم استيراد القالب وتخزينه')));
+      setState(() {}); // لتحديث القائمة
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الاستيراد: $e')));
+      }
+    }
+  }
+
+  Future<void> _applyCustomToCalculator(Map<String, dynamic> entry) async {
+    final t = DzTemplate.fromMap(entry['template'] as Map<String, dynamic>);
+    final list = dzTemplateToCalculatorModel(t);
+    await CalculatorSubjectsIO.setSubjects(list, threshold: t.successThreshold);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تطبيق القالب على الحاسبة')));
+    }
+  }
+
+  Future<void> _deleteCustom(String name) async {
+    await DzCustomTemplatesStore.deleteCustomByName(name);
     if (mounted) setState(() {});
   }
 
-  void _setTerm(TermData t) {
-    setState(() => _term = t);
-    store.saveTerm(t);
+  // بحث داخلي
+  void _runSearch(String q) {
+    q = q.trim().toLowerCase();
+    if (q.isEmpty || _index.isEmpty) {
+      setState(() => _hits = []);
+      return;
+    }
+    final out = <_BuiltInHit>[];
+    dzMajorsLabels.forEach((mKey, mLabel) {
+      final sems = _index[mKey] ?? {};
+      sems.forEach((k, file) {
+        // k = L1_S1, L2_S2 ...
+        final parts = k.split('_');
+        final year = parts.first;
+        final sem = parts.last;
+        final label = '${mLabel} • $year $sem';
+        final hay = (label + ' ' + mKey + ' ' + file).toLowerCase();
+        if (hay.contains(q)) out.add(_BuiltInHit(mKey, label, file, year, sem));
+      });
+    });
+    setState(() => _hits = out.take(20).toList());
   }
 
   @override
   Widget build(BuildContext context) {
-    final title = ["الحاسبة", "الشات", "الإعدادات"][_tab];
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            _BrandMark(size: 22),
-            const SizedBox(width: 8),
-            Text("Fachub • $title"),
-          ],
+      appBar: AppBar(title: const Text('إعدادات Fachub (DZ)')),
+      body: _loadingIndex
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+              children: [
+                // -------------------- كارد القوالب الجاهزة + البحث --------------------
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('اختيار التخصص والسداسي (قوالب جاهزة)',
+                            style: TextStyle(fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 10),
+                        // بحث داخلي
+                        TextField(
+                          controller: _searchCtrl,
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.search),
+                            hintText: 'بحث في القوالب (مثال: إعلام آلي L2 S1 أو informatique L3 S2)',
+                          ),
+                          onChanged: _runSearch,
+                        ),
+                        const SizedBox(height: 10),
+                        if (_hits.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blueGrey.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('نتائج البحث', style: TextStyle(fontWeight: FontWeight.w800)),
+                                const SizedBox(height: 6),
+                                ..._hits.map((h) => ListTile(
+                                  dense: true,
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.description_outlined),
+                                  title: Text(h.label),
+                                  trailing: TextButton(
+                                    child: const Text('تحميل'),
+                                    onPressed: () async {
+                                      try {
+                                        final t = await dzLoadBuiltInTemplateByFile(context, h.file);
+                                        final list = dzTemplateToCalculatorModel(t);
+                                        await CalculatorSubjectsIO.setSubjects(list, threshold: t.successThreshold);
+                                        setState(() { _lastLoadedTitle = t.title; _lastLoadedFile = h.file; });
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم تحميل القالب من البحث')));
+                                        }
+                                      } catch (e) {
+                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
+                                      }
+                                    },
+                                  ),
+                                )),
+                              ],
+                            ),
+                          ),
+
+                        const SizedBox(height: 10),
+                        Row(children: [
+                          Expanded(child: _majorDropdown()),
+                        ]),
+                        const SizedBox(height: 8),
+                        Row(children: [
+                          Expanded(child: _yearDropdown()),
+                          const SizedBox(width: 8),
+                          Expanded(child: _semesterDropdown()),
+                        ]),
+                        const SizedBox(height: 10),
+                        // السابق / تحميل / التالي (تحويل تلقائي بين السداسيات)
+                        Row(
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                final r = dzPrevSem(_year, _semester).split('|');
+                                setState(() { _year = r[0]; _semester = r[1]; });
+                                _loadBuiltIn(); // تحميل تلقائي
+                              },
+                              icon: const Icon(Icons.chevron_left),
+                              label: const Text('السابق'),
+                            ),
+                            const SizedBox(width: 8),
+                            FilledButton.icon(
+                              onPressed: _loadBuiltIn,
+                              icon: const Icon(Icons.download),
+                              label: const Text('تحميل القالب'),
+                            ),
+                            const SizedBox(width: 8),
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                final r = dzNextSem(_year, _semester).split('|');
+                                setState(() { _year = r[0]; _semester = r[1]; });
+                                _loadBuiltIn(); // تحميل تلقائي
+                              },
+                              icon: const Icon(Icons.chevron_right),
+                              label: const Text('التالي'),
+                            ),
+                          ],
+                        ),
+                        if (_lastLoadedTitle != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline, size: 16, color: Colors.grey),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    _lastLoadedTitle!,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        if (_lastLoadedFile != null)
+                          Text('الملف: $_lastLoadedFile',
+                              style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // -------------------- كارد القوالب المخصّصة + مزامنة --------------------
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('قوالبي المخصّصة',
+                            style: TextStyle(fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            FilledButton.icon(
+                              onPressed: _saveAsCustom,
+                              icon: const Icon(Icons.save),
+                              label: const Text('حفظ القالب الحالي'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _importCustomTemplate,
+                              icon: const Icon(Icons.upload_file),
+                              label: const Text('استيراد JSON'),
+                            ),
+                            // مزامنة Firestore
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                try {
+                                  await DzCustomTemplatesSync.uploadAllCustom();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم رفع القوالب إلى السحابة')));
+                                  }
+                                } catch (e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل الرفع: $e')));
+                                }
+                              },
+                              icon: const Icon(Icons.cloud_upload_outlined),
+                              label: const Text('رفع إلى السحابة'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                try {
+                                  await DzCustomTemplatesSync.downloadAllToLocal();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم سحب القوالب إلى الجهاز')));
+                                  }
+                                  setState(() {});
+                                } catch (e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل السحب: $e')));
+                                }
+                              },
+                              icon: const Icon(Icons.cloud_download_outlined),
+                              label: const Text('سحب من السحابة'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        FutureBuilder<List<Map<String, dynamic>>>(
+                          future: DzCustomTemplatesStore.listCustom(),
+                          builder: (context, snap) {
+                            final list = snap.data ?? const [];
+                            if (list.isEmpty) {
+                              return const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 10),
+                                child: Text('لا توجد قوالب محفوظة بعد.'),
+                              );
+                            }
+                            return Column(
+                              children: list.map((e) {
+                                final name = e['name'] as String? ?? 'بدون اسم';
+                                final savedAt = e['saved_at'] as String? ?? '';
+                                return ListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  leading: const Icon(Icons.bookmarks_outlined),
+                                  title: Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                                  subtitle: Text(savedAt, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                  trailing: Wrap(
+                                    spacing: 6,
+                                    children: [
+                                      IconButton(
+                                        tooltip: 'تطبيق على الحاسبة',
+                                        onPressed: () => _applyCustomToCalculator(e),
+                                        icon: const Icon(Icons.playlist_add_check_circle_outlined),
+                                      ),
+                                      IconButton(
+                                        tooltip: 'تصدير JSON',
+                                        onPressed: () => _exportCustomTemplate(e),
+                                        icon: const Icon(Icons.download_outlined),
+                                      ),
+                                      IconButton(
+                                        tooltip: 'حذف',
+                                        onPressed: () => _deleteCustom(name),
+                                        icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // -------------------- كارد بيانات شهادة PDF (اسم/جامعة/شعار) --------------------
+                _certificateCard(),
+              ],
+            ),
+    );
+  }
+
+  // DropDowns
+  Widget _majorDropdown() {
+    return DropdownButtonFormField<String>(
+      value: _major,
+      items: dzMajorsLabels.entries
+          .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+          .toList(),
+      onChanged: (v) => setState(() => _major = v ?? _major),
+      decoration: const InputDecoration(labelText: 'التخصص'),
+    );
+  }
+
+  Widget _yearDropdown() {
+    return DropdownButtonFormField<String>(
+      value: _year,
+      items: dzYears.map((y) => DropdownMenuItem(value: y, child: Text(y))).toList(),
+      onChanged: (v) => setState(() => _year = v ?? _year),
+      decoration: const InputDecoration(labelText: 'السنة'),
+    );
+  }
+
+  Widget _semesterDropdown() {
+    return DropdownButtonFormField<String>(
+      value: _semester,
+      items: dzSemesters.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+      onChanged: (v) => setState(() => _semester = v ?? _semester),
+      decoration: const InputDecoration(labelText: 'السداسي'),
+    );
+  }
+
+  // كارد إعدادات الشهادة (اسم/جامعة/شعار)
+  Card _certificateCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: FutureBuilder(
+          future: Future.wait([
+            CertificateIdentityStore.getName(),
+            CertificateIdentityStore.getUniversity(),
+            CertificateIdentityStore.getLogoBytes(),
+          ]),
+          builder: (context, snap) {
+            String name = (snap.data is List && snap.data!.length >= 1 && snap.data![0] != null)
+                ? (snap.data![0] as String) : '';
+            String uni  = (snap.data is List && snap.data!.length >= 2 && snap.data![1] != null)
+                ? (snap.data![1] as String) : '';
+            Uint8List? logo = (snap.data is List && snap.data!.length >= 3)
+                ? (snap.data![2] as Uint8List?) : null;
+
+            final nameCtrl = TextEditingController(text: name);
+            final uniCtrl  = TextEditingController(text: uni);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('شهادة PDF — معلومات الهوية',
+                    style: TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'اسم الطالب (اختياري)',
+                    prefixIcon: Icon(Icons.badge_outlined),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: uniCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'الجامعة/الكلية (اختياري)',
+                    prefixIcon: Icon(Icons.school_outlined),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        final x = await openFile(acceptedTypeGroups: [
+                          const XTypeGroup(label: 'images', extensions: ['png','jpg','jpeg'])
+                        ]);
+                        if (x == null) return;
+                        final bytes = await x.readAsBytes();
+                        await CertificateIdentityStore.saveLogoBytes(bytes);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('تم حفظ الشعار')),
+                          );
+                          (context as Element).markNeedsBuild();
+                        }
+                      },
+                      icon: const Icon(Icons.image_outlined),
+                      label: const Text('اختيار الشعار'),
+                    ),
+                    const SizedBox(width: 8),
+                    if (logo != null)
+                      Container(
+                        width: 52, height: 52,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                          image: DecorationImage(
+                            image: MemoryImage(logo), fit: BoxFit.cover),
+                        ),
+                      ),
+                    const Spacer(),
+                    FilledButton.icon(
+                      onPressed: () async {
+                        await CertificateIdentityStore.saveName(nameCtrl.text.trim());
+                        await CertificateIdentityStore.saveUniversity(uniCtrl.text.trim());
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('تم حفظ بيانات الشهادة')),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('حفظ البيانات'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                TextButton.icon(
+                  onPressed: () async {
+                    await CertificateIdentityStore.saveLogoBytes(null);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('تم إزالة الشعار')),
+                      );
+                      (context as Element).markNeedsBuild();
+                    }
+                  },
+                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  label: const Text('إزالة الشعار', style: TextStyle(color: Colors.redAccent)),
+                ),
+              ],
+            );
+          },
         ),
       ),
-      body: [
-        GPAScreen(term: _term, onUpdate: _setTerm),
-        ChatScreen(store: store, isOnline: widget.isOnline),
-        SettingsScreenPro(term: _term, onApplyTerm: _setTerm),
-      ][_tab],
+    );
+  }
+}
+
+// كلاس نتيجة البحث
+class _BuiltInHit {
+  final String majorKey;
+  final String label; // "إعلام آلي • L2 S1"
+  final String file;
+  final String year;
+  final String sem;
+  _BuiltInHit(this.majorKey, this.label, this.file, this.year, this.sem);
+}
+
+// ============================================================================
+// يتبع في PART 3/5:
+// - شاشة الحاسبة (DZ) الموصولة بالقوالب + زر شهادة PDF (شعار/اسم/جامعة/QR).
+// - مع أزرار: تحميل/حفظ/إعادة ضبط.
+// ============================================================================
+// ============================================================================
+// PART 3/5 — Calculator DZ + PDF Certificate
+// ============================================================================
+
+class CalculatorScreen extends StatefulWidget {
+  const CalculatorScreen({super.key});
+
+  @override
+  State<CalculatorScreen> createState() => _CalculatorScreenState();
+}
+
+class _CalculatorScreenState extends State<CalculatorScreen> {
+  // المواد بنفس الشكل الناتج من dzTemplateToCalculatorModel
+  List<Map<String, dynamic>> subjects = [];
+  double successThreshold = 10.0; // عتبة النجاح
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromStore();
+  }
+
+  // تحميل القالب/المواد من التخزين المحلي
+  Future<void> _loadFromStore() async {
+    final loaded = await CalculatorSubjectsIO.getSubjects();
+    final thr = await CalculatorSubjectsIO.getThreshold();
+    setState(() {
+      subjects = loaded ?? _sampleSubjects();
+      successThreshold = thr ?? 10.0;
+    });
+  }
+
+  // حفظ المواد الحالية للتخزين
+  Future<void> _saveToStore() async {
+    await CalculatorSubjectsIO.setSubjects(subjects, threshold: successThreshold);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم الحفظ إلى التخزين')));
+  }
+
+  // إعادة ضبط للعينات الافتراضية
+  Future<void> _resetAll() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('إعادة ضبط'),
+        content: const Text('سيتم مسح المواد المحفوظة وإعادة القيم الافتراضية. المتابعة؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('إلغاء')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('تأكيد')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    setState(() {
+      subjects = _sampleSubjects();
+      successThreshold = 10.0;
+    });
+    await CalculatorSubjectsIO.setSubjects(subjects, threshold: successThreshold);
+  }
+
+  // عينة افتراضية إن لم يُحمَّل قالب
+  List<Map<String, dynamic>> _sampleSubjects() => [
+        {
+          'name': 'رياضيات 1',
+          'coef': 4.0,
+          'weights': {'TD': 30.0, 'EXAM': 70.0},
+          'td': 0.0,
+          'exam': 0.0,
+        },
+        {
+          'name': 'أسس الإعلام الآلي',
+          'coef': 3.0,
+          'weights': {'TP': 40.0, 'EXAM': 60.0},
+          'tp': 0.0,
+          'exam': 0.0,
+        },
+        {
+          'name': 'لغة أجنبية',
+          'coef': 1.0,
+          'weights': {'CC': 40.0, 'EXAM': 60.0},
+          'cc': 0.0,
+          'exam': 0.0,
+        },
+      ];
+
+  // حساب علامة مادة واحدة بأخذ الأوزان بعين الاعتبار
+  double _calcGrade(Map s) {
+    final weightsAny = s['weights'];
+    if (weightsAny is Map) {
+      final Map<String, double> w = weightsAny.map(
+        (k, v) => MapEntry(k.toString(), (v as num).toDouble()),
+      );
+      double sum = 0, wsum = 0;
+      void add(String keyField, String weightKey) {
+        if (s.containsKey(keyField) && w.containsKey(weightKey)) {
+          final val = (s[keyField] as num?)?.toDouble() ?? 0.0;
+          final ww = w[weightKey]!;
+          sum += val * ww;
+          wsum += ww;
+        }
+      }
+
+      add('td', 'TD');
+      add('tp', 'TP');
+      add('cc', 'CC');
+      add('exam', 'EXAM');
+
+      if (wsum > 0) return sum / wsum; // لأن الأوزان مئوية (≈ 100)
+    }
+
+    // بديل بسيط في حالة عدم وجود weights
+    if (s.containsKey('td') && s.containsKey('exam')) {
+      return ((s['td'] as num?)?.toDouble() ?? 0) * 0.3 +
+          ((s['exam'] as num?)?.toDouble() ?? 0) * 0.7;
+    }
+    if (s.containsKey('tp') && s.containsKey('exam')) {
+      return ((s['tp'] as num?)?.toDouble() ?? 0) * 0.4 +
+          ((s['exam'] as num?)?.toDouble() ?? 0) * 0.6;
+    }
+    if (s.containsKey('cc') && s.containsKey('exam')) {
+      return ((s['cc'] as num?)?.toDouble() ?? 0) * 0.4 +
+          ((s['exam'] as num?)?.toDouble() ?? 0) * 0.6;
+    }
+    return ((s['exam'] as num?)?.toDouble() ?? 0);
+  }
+
+  // معدل السداسي
+  double _termAverage() {
+    double sum = 0, coefSum = 0;
+    for (final s in subjects) {
+      final coef = ((s['coef'] as num?) ?? 1).toDouble();
+      sum += _calcGrade(s) * coef;
+      coefSum += coef;
+    }
+    if (coefSum == 0) return 0;
+    return sum / coefSum;
+  }
+
+  void _updateScore(int index, String keyField, String v) {
+    final val = double.tryParse(v) ?? 0.0;
+    setState(() => subjects[index][keyField] = val.clamp(0, 20));
+  }
+
+  // --------------------------- PDF Certificate -------------------------------
+  Future<Uint8List> _buildPdfBytes() async {
+    final pdf = pw.Document();
+    final user = FirebaseAuth.instance.currentUser;
+    final email = user?.email ?? 'Student';
+    final avg = _termAverage();
+    final pass = avg >= successThreshold;
+
+    // هوية الشهادة
+    final studentName = (await CertificateIdentityStore.getName()) ?? '';
+    final uniName     = (await CertificateIdentityStore.getUniversity()) ?? '';
+    final logoBytes   = await CertificateIdentityStore.getLogoBytes();
+    pw.ImageProvider? logoImage;
+    if (logoBytes != null && logoBytes.isNotEmpty) {
+      logoImage = pw.MemoryImage(logoBytes);
+    }
+
+    // QR Payload (بسيط)
+    final qrPayload = jsonEncode({
+      'type': 'FachubCertificate',
+      'student': studentName.isNotEmpty ? studentName : email,
+      'university': uniName,
+      'avg': double.parse(avg.toStringAsFixed(2)),
+      'threshold': double.parse(successThreshold.toStringAsFixed(1)),
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+
+    final tableHeaders = ['المادة', 'المعامل', 'الأوزان', 'العلامة'];
+    final tableData = subjects.map((s) {
+      final name = (s['name'] as String?) ?? 'مادة';
+      final coef = ((s['coef'] as num?) ?? 1).toString();
+      final w = (s['weights'] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
+      final weightsStr = (w == null || w.isEmpty)
+          ? '—'
+          : [
+              if (w.containsKey('TD')) 'TD ${w['TD']!.toStringAsFixed(0)}%',
+              if (w.containsKey('TP')) 'TP ${w['TP']!.toStringAsFixed(0)}%',
+              if (w.containsKey('CC')) 'CC ${w['CC']!.toStringAsFixed(0)}%',
+              if (w.containsKey('EXAM')) 'EXAM ${w['EXAM']!.toStringAsFixed(0)}%',
+            ].join(' / ');
+      final grade = _calcGrade(s).toStringAsFixed(2);
+      return [name, coef, weightsStr, grade];
+    }).toList();
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        build: (ctx) => [
+          // رأس الشهادة: شعار + عنوان + QR
+          pw.Row(
+            crossAxisAlignment: pw.CrossAxisAlignment.center,
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              if (logoImage != null)
+                pw.Container(
+                  width: 60, height: 60,
+                  decoration: pw.BoxDecoration(
+                    borderRadius: pw.BorderRadius.circular(8),
+                    border: pw.Border.all(color: PdfColors.grey, width: 0.5),
+                  ),
+                  child: pw.ClipRRect(
+                    horizontalRadius: 8, verticalRadius: 8,
+                    child: pw.Image(logoImage, fit: pw.BoxFit.cover),
+                  ),
+                )
+              else
+                pw.Container(width: 60, height: 60),
+
+              pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.center,
+                children: [
+                  pw.Text('Fachub — شهادة نتيجة السداسي',
+                      style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+                  if (uniName.isNotEmpty)
+                    pw.Text(uniName, style: const pw.TextStyle(fontSize: 12)),
+                ],
+              ),
+
+              pw.SizedBox(
+                width: 60, height: 60,
+                child: pw.BarcodeWidget(
+                  data: qrPayload,
+                  barcode: pw.Barcode.qrCode(),
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 8),
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Text(
+                (studentName.isNotEmpty ? 'الطالب: $studentName' : 'الطالب: $email'),
+                style: const pw.TextStyle(fontSize: 12),
+              ),
+              pw.Text(DateTime.now().toString().substring(0, 16),
+                  style: const pw.TextStyle(fontSize: 10)),
+            ],
+          ),
+          pw.Divider(),
+          pw.SizedBox(height: 6),
+
+          pw.Text('عتبة النجاح: ${successThreshold.toStringAsFixed(1)}'),
+          pw.SizedBox(height: 8),
+
+          pw.Table.fromTextArray(
+            headers: tableHeaders,
+            data: tableData,
+            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+            headerDecoration: const pw.BoxDecoration(color: PdfColors.grey300),
+            cellAlignment: pw.Alignment.centerLeft,
+            columnWidths: {
+              0: const pw.FlexColumnWidth(3),
+              1: const pw.FlexColumnWidth(1),
+              2: const pw.FlexColumnWidth(3),
+              3: const pw.FlexColumnWidth(1.2),
+            },
+          ),
+
+          pw.SizedBox(height: 14),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(10),
+            decoration: pw.BoxDecoration(
+              color: pass ? PdfColors.lightGreen100 : PdfColors.amber100,
+              borderRadius: pw.BorderRadius.circular(6),
+            ),
+            child: pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('المعدل العام: ${avg.toStringAsFixed(2)}',
+                    style: pw.TextStyle(
+                        fontSize: 16, fontWeight: pw.FontWeight.bold,
+                        color: pass ? PdfColors.green800 : PdfColors.orange800)),
+                pw.Text(pass ? 'النتيجة: ناجح' : 'النتيجة: دون العتبة',
+                    style: pw.TextStyle(
+                        fontSize: 14,
+                        fontWeight: pw.FontWeight.bold,
+                        color: pass ? PdfColors.green800 : PdfColors.orange800)),
+              ],
+            ),
+          ),
+
+          pw.SizedBox(height: 10),
+          pw.Text(
+            'ملاحظة: رمز QR يحتوي بيانات التحقق (Student/University/Avg/Threshold/Timestamp).',
+            style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
+          ),
+          pw.SizedBox(height: 6),
+          pw.Align(
+            alignment: pw.Alignment.centerRight,
+            child: pw.Text('Fachub — www.fachub.app',
+                style: const pw.TextStyle(fontSize: 9)),
+          ),
+        ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  Future<void> _sharePdfCertificate() async {
+    try {
+      final bytes = await _buildPdfBytes();
+      await Printing.sharePdf(bytes: bytes, filename: 'Fachub_Certificate.pdf');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر إنشاء PDF: $e')));
+      }
+    }
+  }
+
+  // --------------------------- UI ---------------------------
+  @override
+  Widget build(BuildContext context) {
+    final avg = _termAverage();
+    final pass = avg >= successThreshold;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Fachub • الحاسبة (DZ)'),
+        actions: [
+          IconButton(
+            tooltip: 'شهادة PDF',
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            onPressed: _sharePdfCertificate,
+          ),
+          IconButton(
+            tooltip: 'إعدادات القوالب (DZ)',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const SettingsDzScreen()),
+            ),
+            icon: const Icon(Icons.tune),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 24),
+        children: [
+          // بطاقة المتوسط
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('متوسط السداسي',
+                      style: TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        avg.toStringAsFixed(2),
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          color: pass ? Colors.green : Colors.orange,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: pass ? Colors.green.shade50 : Colors.orange.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          pass ? 'ناجح (≥ ${successThreshold.toStringAsFixed(1)})'
+                               : 'دون العتبة (${successThreshold.toStringAsFixed(1)})',
+                          style: TextStyle(
+                            color: pass ? Colors.green : Colors.orange,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      SizedBox(
+                        width: 120,
+                        child: TextFormField(
+                          initialValue: successThreshold.toStringAsFixed(1),
+                          decoration: const InputDecoration(
+                              labelText: 'عتبة النجاح', isDense: true),
+                          keyboardType:
+                              const TextInputType.numberWithOptions(decimal: true),
+                          onChanged: (v) => setState(() {
+                            successThreshold = double.tryParse(v) ?? successThreshold;
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _loadFromStore,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('تحميل من التخزين'),
+                      ),
+                      FilledButton.icon(
+                        onPressed: _saveToStore,
+                        icon: const Icon(Icons.save),
+                        label: const Text('حفظ إلى التخزين'),
+                      ),
+                      TextButton.icon(
+                        onPressed: _resetAll,
+                        icon: const Icon(Icons.restore),
+                        label: const Text('إعادة ضبط'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // قائمة المواد
+          ...List.generate(subjects.length, (i) => _subjectCard(i)),
+        ],
+      ),
+    );
+  }
+
+  Widget _subjectCard(int i) {
+    final s = subjects[i];
+    final name = (s['name'] as String?) ?? 'مادة';
+    final coef = ((s['coef'] as num?) ?? 1).toDouble();
+    final hasTD = s.containsKey('td');
+    final hasTP = s.containsKey('tp');
+    final hasCC = s.containsKey('cc');
+    final hasEX = s.containsKey('exam');
+    final grade = _calcGrade(s);
+
+    String weightsLabel() {
+      final w = (s['weights'] as Map?)?.map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
+      if (w == null || w.isEmpty) return '—';
+      final parts = <String>[];
+      if (w.containsKey('TD')) parts.add('TD ${w['TD']!.toStringAsFixed(0)}%');
+      if (w.containsKey('TP')) parts.add('TP ${w['TP']!.toStringAsFixed(0)}%');
+      if (w.containsKey('CC')) parts.add('CC ${w['CC']!.toStringAsFixed(0)}%');
+      if (w.containsKey('EXAM')) parts.add('EXAM ${w['EXAM']!.toStringAsFixed(0)}%');
+      return parts.join(' • ');
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Expanded(
+              child: Text(name, style: const TextStyle(fontWeight: FontWeight.w800)),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text('Coeff ${coef.toStringAsFixed(0)}',
+                  style: const TextStyle(color: Colors.black54)),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                grade.toStringAsFixed(2),
+                style: const TextStyle(
+                    color: kFachubBlue, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 8),
+          Text('الأوزان: ${weightsLabel()}',
+              style: const TextStyle(color: Colors.black54)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (hasTD) _scoreField(i, 'td', 'TD'),
+              if (hasTP) _scoreField(i, 'tp', 'TP'),
+              if (hasCC) _scoreField(i, 'cc', 'CC'),
+              if (hasEX) _scoreField(i, 'exam', 'EXAM'),
+            ],
+          ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _scoreField(int index, String keyField, String label) {
+    final current =
+        ((subjects[index][keyField] as num?) ?? 0).toDouble().toStringAsFixed(1);
+    return SizedBox(
+      width: 110,
+      child: TextFormField(
+        initialValue: current,
+        decoration: InputDecoration(
+          labelText: label,
+          isDense: true,
+          border: const OutlineInputBorder(),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        ),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        onChanged: (v) => _updateScore(index, keyField, v),
+      ),
+    );
+  }
+}
+// ============================================================================
+// PART 4/5 — HomeTabs + ChatScreen + Community (Reddit-like)
+// ============================================================================
+
+class HomeTabs extends StatefulWidget {
+  const HomeTabs({super.key});
+  @override
+  State<HomeTabs> createState() => _HomeTabsState();
+}
+
+class _HomeTabsState extends State<HomeTabs> {
+  int index = 0;
+
+  final tabs = const [
+    CalculatorScreen(),
+    ChatScreen(),
+    SettingsDzScreen(),
+    CommunityScreen(isOnline: true),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: tabs[index],
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
+        selectedIndex: index,
+        onDestinationSelected: (i) => setState(() => index = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.calculate_outlined), label: "حاسبة"),
-          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: "شات"),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), label: "إعدادات"),
+          NavigationDestination(icon: Icon(Icons.calculate), label: 'حاسبة'),
+          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: 'شات'),
+          NavigationDestination(icon: Icon(Icons.settings), label: 'إعدادات DZ'),
+          NavigationDestination(icon: Icon(Icons.dynamic_feed_outlined), label: 'مجتمع'),
         ],
       ),
     );
   }
 }
 
-class _BrandMark extends StatelessWidget {
-  final double size;
-  const _BrandMark({required this.size});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size, height: size,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [kFachubGreen, kFachubBlue]),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Icon(Icons.school, size: 16, color: Colors.white),
-    );
-  }
-}
-
-// ------------------------------ Chat Screen ----------------------------------
+// ---------------------------------------------------------------------------
+// ChatScreen — Firebase chat + emoji picker + image upload
+// ---------------------------------------------------------------------------
 class ChatScreen extends StatefulWidget {
-  final IDataStore store;
-  final bool isOnline;
-  const ChatScreen({super.key, required this.store, required this.isOnline});
-
+  const ChatScreen({super.key});
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  ChatChannel? _current;
-  bool _showOnlyDMs = false;
-  final TextEditingController _composer = TextEditingController();
-  final ScrollController _scroll = ScrollController();
+  final msgCtrl = TextEditingController();
+  XFile? _pickedImage;
+  Uint8List? _pickedImageBytes;
+  bool _sending = false;
 
-  final List<String> _emojis = [
-    "😀","😁","😂","🤣","😊","😍","😘","😎","🤩",
-    "👍","👏","🙏","🔥","💯","🎉","✅","❗","❓",
-  ];
-
-  @override
-  void dispose() {
-    _composer.dispose();
-    _scroll.dispose();
-    super.dispose();
+  Future<void> _pickFile() async {
+    final x = await openFile(acceptedTypeGroups: [
+      const XTypeGroup(label: 'images', extensions: ['png','jpg','jpeg','gif']),
+      const XTypeGroup(label: 'docs', extensions: ['pdf'])
+    ]);
+    if (x == null) return;
+    setState(() {
+      _pickedImage = x;
+    });
+    // حاول قراءة bytes للمعاينة لو صورة
+    final ext = x.name.toLowerCase();
+    if (ext.endsWith('.png') || ext.endsWith('.jpg') || ext.endsWith('.jpeg') || ext.endsWith('.gif')) {
+      _pickedImageBytes = await x.readAsBytes();
+      setState(() {});
+    } else {
+      _pickedImageBytes = null;
+    }
   }
 
-  void _switchChannel(ChatChannel c) {
-    setState(() => _current = c);
+  void _insertEmoji(String e) {
+    final t = msgCtrl.text;
+    final sel = msgCtrl.selection;
+    final newText = t.replaceRange(
+      sel.isValid ? sel.start : t.length,
+      sel.isValid ? sel.end : t.length,
+      e,
+    );
+    setState(() {
+      msgCtrl.text = newText;
+      msgCtrl.selection = TextSelection.fromPosition(TextPosition(offset: (sel.isValid ? sel.start : t.length) + e.length));
+    });
+  }
+
+  Future<String?> _uploadPickedIfAny() async {
+    if (_pickedImage == null) return null;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+    final ext = _pickedImage!.name.split('.').last;
+    final ref = FirebaseStorage.instance
+        .ref('chat_uploads/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.$ext');
+    await ref.putData(await _pickedImage!.readAsBytes());
+    return await ref.getDownloadURL();
   }
 
   Future<void> _send() async {
-    final text = _composer.text.trim();
-    if (text.isEmpty || _current == null) return;
-    await widget.store.sendMessage(_current!.id, text, sender: "Khaled");
-    _composer.clear();
-
-    await Future.delayed(const Duration(milliseconds: 50));
-    if (mounted && _scroll.hasClients) {
-      _scroll.animateTo(
-        _scroll.position.maxScrollExtent + 80,
-        duration: const Duration(milliseconds: 240),
-        curve: Curves.easeOut,
-      );
+    if (_sending) return;
+    final txt = msgCtrl.text.trim();
+    if (txt.isEmpty && _pickedImage == null) return;
+    setState(() => _sending = true);
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final url = await _uploadPickedIfAny();
+      await FirebaseFirestore.instance.collection('messages').add({
+        'senderUid': user?.uid,
+        'sender': user?.email ?? 'Guest',
+        'message': txt,
+        'fileUrl': url,
+        'time': FieldValue.serverTimestamp(),
+      });
+      msgCtrl.clear();
+      setState(() {
+        _pickedImage = null;
+        _pickedImageBytes = null;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر الإرسال: $e')));
+    } finally {
+      setState(() => _sending = false);
     }
   }
 
-  Future<void> _createChannel() async {
-    final res = await showDialog<ChatChannel>(
-      context: context,
-      builder: (_) => const _NewChannelDialog(),
-    );
-    if (res != null) {
-      final created = await widget.store.createChannel(res.name, isDM: res.isDM);
-      setState(() => _current = created);
-    }
-  }
-
-  Future<void> _renameChannel() async {
-    final c = _current;
-    if (c == null) return;
-    final ctrl = TextEditingController(text: c.name);
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("إعادة تسمية القناة"),
-        content: TextField(
-          controller: ctrl,
-          decoration: const InputDecoration(labelText: "اسم القناة"),
-        ),
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Fachub • الشات'),
+        centerTitle: true,
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("إلغاء")),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("حفظ")),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: () => FirebaseAuth.instance.signOut(),
+            tooltip: 'تسجيل الخروج',
+          )
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('messages')
+                  .orderBy('time', descending: true)
+                  .snapshots(),
+              builder: (context, snap) {
+                if (!snap.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final docs = snap.data!.docs;
+                if (docs.isEmpty) {
+                  return const Center(child: Text('ابدأ المحادثة ✨'));
+                }
+                return ListView.builder(
+                  reverse: true,
+                  itemCount: docs.length,
+                  itemBuilder: (_, i) {
+                    final m = docs[i].data() as Map<String, dynamic>;
+                    final isMe = (m['senderUid'] == user?.uid);
+                    final hasFile = (m['fileUrl'] as String?)?.isNotEmpty == true;
+                    return Align(
+                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        padding: const EdgeInsets.all(10),
+                        constraints: const BoxConstraints(maxWidth: 320),
+                        decoration: BoxDecoration(
+                          color: isMe ? kFachubBlue.withOpacity(0.1) : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(m['sender'] ?? 'مجهول',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                            if ((m['message'] ?? '').toString().isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(m['message'] ?? ''),
+                            ],
+                            if (hasFile) ...[
+                              const SizedBox(height: 6),
+                              InkWell(
+                                onTap: () async => await Printing.layoutPdf(
+                                  onLayout: (_) async {
+                                    // مجرد فتح رابط عبر printing ليس مباشراً، فعليًا يمكنك فتحه بlaunchUrl
+                                    // هنا فقط نعرض Placeholder — يمكنك فتحه عبر url_launcher إن رغبت لاحقًا.
+                                    final pdf = pw.Document()
+                                      ..addPage(pw.Page(build: (c) => pw.Center(
+                                        child: pw.Text('تم رفع ملف: ${m['fileUrl']}'),
+                                      )));
+                                    return pdf.save();
+                                  }),
+                                child: Text(
+                                  '📎 ملف مرفوع',
+                                  style: TextStyle(color: kFachubBlue, decoration: TextDecoration.underline),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+
+          // معاينة الملف المختار
+          if (_pickedImage != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(color: Colors.grey.shade100),
+              child: Row(
+                children: [
+                  if (_pickedImageBytes != null)
+                    Container(
+                      width: 48, height: 48,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        image: DecorationImage(image: MemoryImage(_pickedImageBytes!), fit: BoxFit.cover),
+                      ),
+                    )
+                  else
+                    const Icon(Icons.insert_drive_file_outlined, size: 36),
+                  const SizedBox(width: 10),
+                  Expanded(child: Text(_pickedImage!.name, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                  IconButton(
+                    onPressed: () => setState(() { _pickedImage = null; _pickedImageBytes = null; }),
+                    icon: const Icon(Icons.close),
+                  )
+                ],
+              ),
+            ),
+
+          // شريط الإدخال
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(8, 6, 8, 12),
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Emoji',
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (_) => _EmojiSheet(onPick: _insertEmoji),
+                      );
+                    },
+                    icon: const Icon(Icons.emoji_emotions_outlined),
+                  ),
+                  IconButton(
+                    tooltip: 'إرفاق',
+                    onPressed: _pickFile,
+                    icon: const Icon(Icons.attach_file),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: msgCtrl,
+                      decoration: const InputDecoration(
+                        hintText: "اكتب رسالة...",
+                        border: OutlineInputBorder(),
+                      ),
+                      minLines: 1,
+                      maxLines: 4,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.icon(
+                    onPressed: _sending ? null : _send,
+                    icon: const Icon(Icons.send_rounded),
+                    label: const Text('إرسال'),
+                  ),
+                ],
+              ),
+            ),
+          )
         ],
       ),
     );
-    if (ok == true) {
-      final newName = ctrl.text.trim();
-      if (newName.isNotEmpty) {
-        await widget.store.renameChannel(c.id, newName);
-        setState(() => _current = ChatChannel(id: c.id, name: newName, isDM: c.isDM));
+  }
+}
+
+class _EmojiSheet extends StatelessWidget {
+  final void Function(String) onPick;
+  const _EmojiSheet({required this.onPick, super.key});
+  @override
+  Widget build(BuildContext context) {
+    const emojis = [
+      '😀','😁','😂','🤣','😊','😍','😘','😎','🤩','😇',
+      '👍','👌','🙏','👏','💪','🔥','✨','🎉','✅','❌',
+    ];
+    return SafeArea(
+      child: GridView.count(
+        crossAxisCount: 8,
+        padding: const EdgeInsets.all(12),
+        shrinkWrap: true,
+        children: emojis.map((e) => InkWell(
+          onTap: () { onPick(e); Navigator.pop(context); },
+          child: Center(child: Text(e, style: const TextStyle(fontSize: 22))),
+        )).toList(),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// CommunityScreen — Reddit-like feed: posts + likes + comments + tags + drafts
+// ---------------------------------------------------------------------------
+class CommunityScreen extends StatefulWidget {
+  final bool isOnline;
+  const CommunityScreen({super.key, required this.isOnline});
+  @override
+  State<CommunityScreen> createState() => _CommunityScreenState();
+}
+
+class _CommunityScreenState extends State<CommunityScreen> {
+  final postCtrl = TextEditingController();
+  final tagCtrl = TextEditingController();
+  List<XFile> _pickedImgs = [];
+  List<Uint8List> _pickedImgBytes = [];
+
+  String _tab = 'new'; // new | top
+  String _searchTag = '';
+
+  // مسوّدات محليًا
+  static const _draftKey = 'community_drafts_v1';
+
+  @override
+  void dispose() {
+    postCtrl.dispose();
+    tagCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickPostImages() async {
+    final xs = await openFiles(acceptedTypeGroups: [
+      const XTypeGroup(label: 'images', extensions: ['png','jpg','jpeg'])
+    ]);
+    if (xs == null || xs.isEmpty) return;
+    _pickedImgs = xs;
+    _pickedImgBytes = [];
+    for (final x in xs) {
+      try { _pickedImgBytes.add(await x.readAsBytes()); } catch (_) {}
+    }
+    setState(() {});
+  }
+
+  Future<List<String>> _uploadPostImages(String uid) async {
+    final out = <String>[];
+    for (final x in _pickedImgs) {
+      final ext = x.name.split('.').last;
+      final ref = FirebaseStorage.instance.ref('posts/$uid/${DateTime.now().millisecondsSinceEpoch}_${x.name}');
+      await ref.putData(await x.readAsBytes(), SettableMetadata(contentType: 'image/$ext'));
+      out.add(await ref.getDownloadURL());
+    }
+    return out;
+  }
+
+  List<String> _extractTags(String text, String manual) {
+    final all = <String>{};
+    final rx = RegExp(r'#([A-Za-z0-9_\u0600-\u06FF]+)');
+    for (final m in rx.allMatches(text)) {
+      all.add(m.group(1)!.toLowerCase());
+    }
+    if (manual.trim().isNotEmpty) {
+      for (final part in manual.split(RegExp(r'[,\s]+'))) {
+        final p = part.trim();
+        if (p.isNotEmpty) all.add(p.replaceAll('#','').toLowerCase());
       }
     }
+    return all.toList();
   }
 
-  Future<void> _deleteChannel() async {
-    final c = _current;
-    if (c == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("حذف القناة؟"),
-        content: Text("سيتم حذف \"${c.name}\" (والرسائل حسب المزوِّد)."),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("إلغاء")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("حذف"),
-          ),
-        ],
-      ),
-    );
-    if (ok == true) {
-      await widget.store.deleteChannel(c.id);
-      setState(() => _current = null);
+  Future<void> _createPost() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('سجّل الدخول أولًا')));
+      return;
+    }
+    final text = postCtrl.text.trim();
+    if (text.isEmpty && _pickedImgs.isEmpty) return;
+
+    try {
+      final tags = _extractTags(text, tagCtrl.text);
+      final images = await _uploadPostImages(user.uid);
+      await FirebaseFirestore.instance.collection('posts').add({
+        'authorUid': user.uid,
+        'author': user.email ?? 'Guest',
+        'text': text,
+        'images': images,
+        'tags': tags,
+        'likesCount': 0,
+        'commentsCount': 0,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      postCtrl.clear();
+      tagCtrl.clear();
+      _pickedImgs = [];
+      _pickedImgBytes = [];
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم نشر المنشور ✅')));
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('تعذر النشر: $e')));
     }
   }
 
-  void _openEmojiPicker() {
-    showModalBottomSheet(
+  Future<void> _saveDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    final drafts = prefs.getStringList(_draftKey) ?? <String>[];
+    final m = {
+      'text': postCtrl.text,
+      'tags': tagCtrl.text,
+      'time': DateTime.now().toIso8601String(),
+    };
+    drafts.add(jsonEncode(m));
+    await prefs.setStringList(_draftKey, drafts);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تم حفظ المسودة')));
+  }
+
+  Future<void> _loadDrafts() async {
+    final prefs = await SharedPreferences.getInstance();
+    final drafts = prefs.getStringList(_draftKey) ?? <String>[];
+    if (drafts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لا توجد مسودات')));
+      return;
+    }
+    await showModalBottomSheet(
       context: context,
-      showDragHandle: true,
       builder: (_) {
         return SafeArea(
-          child: Padding(
+          child: ListView.separated(
             padding: const EdgeInsets.all(12),
-            child: Wrap(
-              spacing: 10, runSpacing: 10,
-              children: _emojis.map((e) => InkWell(
+            itemCount: drafts.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final m = jsonDecode(drafts[i]) as Map<String, dynamic>;
+              return ListTile(
+                title: Text((m['text'] as String?)?.take(80) ?? ''),
+                subtitle: Text(m['time'] ?? ''),
+                trailing: Text((m['tags'] ?? '').toString()),
                 onTap: () {
-                  _composer.text =
-                      _composer.text + (_composer.text.isEmpty ? "" : " ") + e;
-                  _composer.selection = TextSelection.fromPosition(
-                    TextPosition(offset: _composer.text.length),
-                  );
+                  postCtrl.text = (m['text'] ?? '').toString();
+                  tagCtrl.text = (m['tags'] ?? '').toString();
                   Navigator.pop(context);
+                  setState(() {});
                 },
-                child: Container(
-                  width: 44, height: 44,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    color: Colors.grey.shade100,
-                  ),
-                  child: Text(e, style: const TextStyle(fontSize: 22)),
-                ),
-              )).toList(),
-            ),
+              );
+            },
           ),
         );
       },
     );
   }
 
-  // -------- إرفاق ملف باستخدام file_selector (متوافق مع Flutter 3.24+) ------
-  Future<void> _attachFile() async {
-    if (_current == null) return;
-
-    // نقبل أي نوع (ممكن تخصص الامتدادات لاحقًا)
-    final typeGroup = XTypeGroup(label: 'any');
-    final XFile? xfile = await openFile(acceptedTypeGroups: [typeGroup]);
-    if (xfile == null) return;
-
-    final name = xfile.name;
-    final bytes = await xfile.readAsBytes();
-
-    if (widget.isOnline) {
-      try {
-        final ref = FirebaseStorage.instance
-            .ref()
-            .child('uploads/${_current!.id}/${DateTime.now().millisecondsSinceEpoch}_$name');
-
-        await ref.putData(bytes);
-        final url = await ref.getDownloadURL();
-
-        await widget.store
-            .sendMessage(_current!.id, "📎 $name\n$url", sender: "Khaled");
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("فشل الرفع: $e")),
-        );
-      }
-    } else {
-      // Offline: خزّن الملف مؤقتًا وسجّل مساره في PendingQueue
-      final dir = await getTemporaryDirectory();
-      final path =
-          '${dir.path}/${DateTime.now().millisecondsSinceEpoch}_$name';
-      final f = File(path);
-      await f.writeAsBytes(bytes);
-
-      await PendingQueue.push(PendingMessage(
-        channelId: _current!.id,
-        sender: "Khaled",
-        text: "📎 $name (سيتم رفعه عند الاتصال)",
-        time: DateTime.now(),
-        localPath: path,
-        fileName: name,
-        mimeType: null,
-      ));
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("تمت إضافة المرفق إلى قائمة الانتظار (Offline)")),
-      );
+  Query _buildQuery() {
+    final col = FirebaseFirestore.instance.collection('posts');
+    if (_tab == 'top') {
+      return (_searchTag.isEmpty)
+          ? col.orderBy('likesCount', descending: true).limit(50)
+          : col.where('tags', arrayContains: _searchTag.toLowerCase())
+               .orderBy('likesCount', descending: true).limit(50);
     }
+    // new
+    return (_searchTag.isEmpty)
+        ? col.orderBy('createdAt', descending: true).limit(50)
+        : col.where('tags', arrayContains: _searchTag.toLowerCase())
+             .orderBy('createdAt', descending: true).limit(50);
+  }
+
+  Future<void> _toggleLike(DocumentSnapshot doc) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final postRef = doc.reference;
+    final likeRef = postRef.collection('likes').doc(user.uid);
+    final likeSnap = await likeRef.get();
+
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final fresh = await tx.get(postRef);
+      int likes = (fresh.data() as Map<String, dynamic>)['likesCount'] ?? 0;
+      if (likeSnap.exists) {
+        // إزالة إعجاب
+        tx.delete(likeRef);
+        tx.update(postRef, {'likesCount': (likes - 1).clamp(0, 1<<31)});
+      } else {
+        // إعجاب
+        tx.set(likeRef, {'uid': user.uid, 'at': FieldValue.serverTimestamp()});
+        tx.update(postRef, {'likesCount': likes + 1});
+      }
+    });
+  }
+
+  Future<void> _addComment(DocumentSnapshot doc, String text) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || text.trim().isEmpty) return;
+    final postRef = doc.reference;
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      tx.set(postRef.collection('comments').doc(), {
+        'uid': user.uid,
+        'author': user.email ?? 'Guest',
+        'text': text.trim(),
+        'at': FieldValue.serverTimestamp(),
+      });
+      final fresh = await tx.get(postRef);
+      final cc = (fresh.data() as Map<String, dynamic>)['commentsCount'] ?? 0;
+      tx.update(postRef, {'commentsCount': cc + 1});
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _ChatHeaderBar(
-          isOnline: widget.isOnline,
-          current: _current,
-          showOnlyDMs: _showOnlyDMs,
-          onToggleDMs: (v) => setState(() => _showOnlyDMs = v),
-          onNewChannel: _createChannel,
-          onRename: _renameChannel,
-          onDelete: _deleteChannel,
-        ),
-        SizedBox(
-          height: 56,
-          child: StreamBuilder<List<ChatChannel>>(
-            stream: widget.store.channels(),
-            builder: (context, snap) {
-              final all = snap.data ?? const <ChatChannel>[];
-              final list = _showOnlyDMs ? all.where((c) => c.isDM).toList() : all;
+    final user = FirebaseAuth.instance.currentUser;
 
-              if (_current == null && list.isNotEmpty) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted && _current == null) setState(() => _current = list.first);
-                });
-              }
-
-              return ListView.separated(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                scrollDirection: Axis.horizontal,
-                itemBuilder: (_, i) {
-                  final ch = list[i];
-                  final selected = _current?.id == ch.id;
-                  return ChoiceChip(
-                    label: Text(ch.isDM ? "DM: ${ch.name}" : "# ${ch.name}"),
-                    selected: selected,
-                    onSelected: (_) => _switchChannel(ch),
-                  );
-                },
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemCount: list.length,
-              );
-            },
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Fachub • المجتمع'),
+        actions: [
+          IconButton(
+            tooltip: 'مسودات',
+            onPressed: _loadDrafts,
+            icon: const Icon(Icons.drafts_outlined),
           ),
-        ),
-        const Divider(height: 1),
-        Expanded(
-          child: _current == null
-              ? const Center(child: Text("لا توجد قنوات حالياً. أنشئ قناة جديدة."))
-              : StreamBuilder<List<ChatMessage>>(
-                  stream: widget.store.messages(_current!.id),
-                  builder: (context, snap) {
-                    final msgs = snap.data ?? const <ChatMessage>[];
-                    return ListView.builder(
-                      controller: _scroll,
-                      padding: const EdgeInsets.all(14),
-                      itemCount: msgs.length,
-                      itemBuilder: (_, i) => _ChatBubble(msg: msgs[i]),
-                    );
-                  },
-                ),
-        ),
-        const Divider(height: 1),
-        _ComposerBar(
-          controller: _composer,
-          onAttach: _attachFile,
-          onEmoji: _openEmojiPicker,
-          onSend: _send,
-        ),
-      ],
-    );
-  }
-}
-
-// ------------------------------ Chat Widgets ---------------------------------
-class _ChatHeaderBar extends StatelessWidget {
-  final bool isOnline;
-  final ChatChannel? current;
-  final bool showOnlyDMs;
-  final ValueChanged<bool> onToggleDMs;
-  final VoidCallback onNewChannel;
-  final VoidCallback onRename;
-  final VoidCallback onDelete;
-
-  const _ChatHeaderBar({
-    required this.isOnline,
-    required this.current,
-    required this.showOnlyDMs,
-    required this.onToggleDMs,
-    required this.onNewChannel,
-    required this.onRename,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final subtitle = isOnline ? "Online • Firebase" : "Offline • Local";
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
-      child: Row(
+        ],
+      ),
+      body: Column(
         children: [
-          Icon((current?.isDM ?? false) ? Icons.person : Icons.tag, color: kFachubBlue),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  current == null ? "لا قناة" : ((current!.isDM ? "DM • " : "# ") + current!.name),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+          // إنشاء منشور
+          Card(
+            margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('أنشئ منشورًا', style: TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: postCtrl,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'اكتب سؤالك/فكرتك… استخدم #وسوم و @منشن',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
-                Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(
+                    child: TextField(
+                      controller: tagCtrl,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.tag),
+                        hintText: 'وسوم إضافية (مفصولة بمسافات أو فواصل)',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _pickPostImages,
+                    icon: const Icon(Icons.image_outlined),
+                    label: const Text('صور'),
+                  ),
+                ]),
+                if (_pickedImgBytes.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 74,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _pickedImgBytes.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) => ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.memory(_pickedImgBytes[i], width: 74, height: 74, fit: BoxFit.cover),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    FilledButton.icon(
+                      onPressed: _createPost,
+                      icon: const Icon(Icons.send_rounded),
+                      label: const Text('نشر'),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: _saveDraft,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('حفظ كمسودة'),
+                    ),
+                  ],
+                ),
+              ]),
             ),
           ),
-          FilterChip(label: const Text("DMs فقط"), selected: showOnlyDMs, onSelected: onToggleDMs),
-          const SizedBox(width: 8),
-          IconButton(tooltip: "قناة جديدة", onPressed: onNewChannel, icon: const Icon(Icons.add_circle_outline)),
-          IconButton(tooltip: "إعادة تسمية", onPressed: onRename, icon: const Icon(Icons.edit_outlined)),
-          IconButton(
-            tooltip: "حذف القناة",
-            onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+
+          // فلاتر
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(children: [
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'new', label: Text('الأحدث'), icon: Icon(Icons.fiber_new)),
+                  ButtonSegment(value: 'top', label: Text('الأكثر إعجابًا'), icon: Icon(Icons.trending_up)),
+                ],
+                selected: {_tab},
+                onSelectionChanged: (s) => setState(() => _tab = s.first),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.search),
+                    hintText: 'ابحث بالهاشتاغ (مثال: #رياضيات)',
+                    isDense: true, border: OutlineInputBorder(),
+                  ),
+                  onSubmitted: (v) => setState(() => _searchTag = v.replaceAll('#','').trim()),
+                ),
+              ),
+            ]),
+          ),
+
+          const SizedBox(height: 8),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: _buildQuery().snapshots(),
+              builder: (_, snap) {
+                if (!snap.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final posts = snap.data!.docs;
+                if (posts.isEmpty) {
+                  return const Center(child: Text('لا توجد منشورات بعد.'));
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                  itemCount: posts.length,
+                  itemBuilder: (_, i) => _postCard(posts[i], currentUid: user?.uid),
+                );
+              },
+            ),
           ),
         ],
       ),
     );
   }
-}
 
-class _ComposerBar extends StatelessWidget {
-  final TextEditingController controller;
-  final VoidCallback onSend;
-  final VoidCallback onAttach;
-  final VoidCallback onEmoji;
-  const _ComposerBar({
-    required this.controller,
-    required this.onSend,
-    required this.onAttach,
-    required this.onEmoji,
-  });
+  Widget _postCard(DocumentSnapshot doc, {String? currentUid}) {
+    final m = doc.data() as Map<String, dynamic>;
+    final text = (m['text'] ?? '').toString();
+    final images = ((m['images'] ?? []) as List).cast<String>();
+    final tags = ((m['tags'] ?? []) as List).cast<String>();
+    final likes = (m['likesCount'] ?? 0) as int;
+    final comments = (m['commentsCount'] ?? 0) as int;
+    final author = (m['author'] ?? 'مجهول').toString();
 
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-        child: Row(
-          children: [
-            IconButton(tooltip: "إرفاق", onPressed: onAttach, icon: const Icon(Icons.attach_file)),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                minLines: 1,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: "اكتب رسالة…",
-                  suffixIcon: IconButton(
-                    onPressed: onEmoji,
-                    icon: const Icon(Icons.emoji_emotions_outlined),
-                  ),
-                ),
-                onSubmitted: (_) => onSend(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton(onPressed: onSend, child: const Text("إرسال")),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ChatBubble extends StatelessWidget {
-  final ChatMessage msg;
-  const _ChatBubble({required this.msg});
-
-  @override
-  Widget build(BuildContext context) {
-    final isMe = msg.sender == "Khaled";
-    final bubbleColor = isMe ? kFachubBlue.withOpacity(.10) : Colors.grey.shade100;
-
-    String timeLabel(DateTime d) {
-      final hh = d.hour.toString().padLeft(2, '0');
-      final mm = d.minute.toString().padLeft(2, '0');
-      return "$hh:$mm";
+    // تمييز @mentions
+    InlineSpan _buildRich(String s) {
+      final spans = <TextSpan>[];
+      final rxMention = RegExp(r'@([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})');
+      int idx = 0;
+      for (final m in rxMention.allMatches(s)) {
+        if (m.start > idx) spans.add(TextSpan(text: s.substring(idx, m.start)));
+        spans.add(TextSpan(
+          text: m.group(0)!,
+          style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.w700),
+        ));
+        idx = m.end;
+      }
+      if (idx < s.length) spans.add(TextSpan(text: s.substring(idx)));
+      return TextSpan(children: spans, style: const TextStyle(color: Colors.black87));
     }
 
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 360),
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 6),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            color: bubbleColor,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    final commentCtrl = TextEditingController();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(
             children: [
-              Text(msg.sender, style: const TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 4),
-              Text(msg.text),
-              const SizedBox(height: 4),
-              Text(timeLabel(msg.time), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              const CircleAvatar(child: Icon(Icons.person)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(author, style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              TextButton.icon(
+                onPressed: () => _toggleLike(doc),
+                icon: const Icon(Icons.thumb_up_alt_outlined, size: 18),
+                label: Text(likes.toString()),
+              ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// --------------------------- New Channel Dialog -------------------------------
-class _NewChannelDialog extends StatefulWidget {
-  const _NewChannelDialog();
-
-  @override
-  State<_NewChannelDialog> createState() => _NewChannelDialogState();
-}
-
-class _NewChannelDialogState extends State<_NewChannelDialog> {
-  final TextEditingController name = TextEditingController();
-  bool isDM = false;
-
-  @override
-  void dispose() {
-    name.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text("قناة جديدة"),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: name,
-            decoration: const InputDecoration(labelText: "اسم القناة", hintText: "مثال: promo-2CS"),
-          ),
+          const SizedBox(height: 8),
+          RichText(text: _buildRich(text)),
+          if (images.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 140,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: images.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) => ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: Image.network(images[i], width: 180, height: 140, fit: BoxFit.cover),
+                ),
+              ),
+            ),
+          ],
+          if (tags.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              children: tags.map((t) => Chip(label: Text('#$t'))).toList(),
+            ),
+          ],
           const SizedBox(height: 8),
           Row(
             children: [
-              Switch(value: isDM, activeColor: kFachubGreen, onChanged: (v) => setState(() => isDM = v)),
-              const SizedBox(width: 8),
-              const Text("Direct Message (DM)"),
+              const Icon(Icons.comment_outlined, size: 18),
+              const SizedBox(width: 6),
+              Text('$comments تعليق'),
+              const Spacer(),
+              IconButton(
+                tooltip: 'عرض التعليقات',
+                onPressed: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (_) => _CommentsSheet(
+                      postDoc: doc,
+                      onAdd: (txt) => _addComment(doc, txt),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.expand_more),
+              )
             ],
           ),
-          const SizedBox(height: 4),
-          const Text(
-            "عند الربط مع Firebase سيتم حفظ القناة والرسائل في السحابة.",
-            style: TextStyle(color: Colors.grey, fontSize: 12),
-          ),
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text("إلغاء")),
-        ElevatedButton(
-          onPressed: () {
-            final nm = name.text.trim();
-            if (nm.isEmpty) return;
-            final id = (isDM ? "dm_" : "c_") + nm.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '').toLowerCase();
-            Navigator.pop(context, ChatChannel(id: id, name: nm, isDM: isDM));
-          },
-          child: const Text("إنشاء"),
-        ),
-      ],
-    );
-  }
-}
-// ======================= Fachub (main.dart) — FINAL (Part 3/3) =======================
-
-// ------------------------------ GPA SCREEN -----------------------------------
-class GPAScreen extends StatefulWidget {
-  final TermData term;
-  final ValueChanged<TermData> onUpdate;
-  const GPAScreen({super.key, required this.term, required this.onUpdate});
-
-  @override
-  State<GPAScreen> createState() => _GPAScreenState();
-}
-
-class _GPAScreenState extends State<GPAScreen> {
-  late TermData _term;
-
-  @override
-  void initState() {
-    super.initState();
-    _term = widget.term.copy();
-  }
-
-  void _updateSubject(Subject s, int partIndex, double newScore) {
-    setState(() => s.parts[partIndex].score = newScore.clamp(0, 20));
-    widget.onUpdate(_term.copy());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final avg = termAverage(_term);
-    final passed = avg >= _term.system.passThreshold;
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        Card(
-          elevation: 0.2,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                const Icon(Icons.school_outlined, color: kFachubBlue),
-                const SizedBox(width: 8),
-                Text(_term.label, style: const TextStyle(fontWeight: FontWeight.w700)),
-                const Spacer(),
-                Text(
-                  "${avg.toStringAsFixed(_term.system.roundTo)} / 20",
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: passed ? kFachubGreen : Colors.redAccent,
+          const Divider(),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: commentCtrl,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    hintText: 'اكتب تعليقًا…',
+                    border: OutlineInputBorder(),
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: () async {
+                  await _addComment(doc, commentCtrl.text);
+                  commentCtrl.clear();
+                },
+                child: const Text('تعليق'),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 8),
-        ..._term.subjects.map((s) => _SubjectCard(s: s, onPartEdit: _updateSubject)),
-      ],
+        ]),
+      ),
     );
   }
 }
 
-class _SubjectCard extends StatelessWidget {
-  final Subject s;
-  final void Function(Subject s, int partIndex, double newScore) onPartEdit;
-  const _SubjectCard({required this.s, required this.onPartEdit});
+class _CommentsSheet extends StatelessWidget {
+  final DocumentSnapshot postDoc;
+  final Future<void> Function(String) onAdd;
+  const _CommentsSheet({super.key, required this.postDoc, required this.onAdd});
 
   @override
   Widget build(BuildContext context) {
-    final avg = s.average();
-    final color = s.eliminatory && avg < s.eliminatoryThreshold
-        ? Colors.redAccent
-        : kFachubBlue;
+    final commentsCol = postDoc.reference.collection('comments')
+        .orderBy('at', descending: true);
+    final ctrl = TextEditingController();
 
-    return Card(
-      elevation: 0.2,
-      margin: const EdgeInsets.only(bottom: 8),
+    return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(s.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                const Spacer(),
-                Text("Coef ${s.coeff}"),
-                const SizedBox(width: 12),
-                Text(avg.toStringAsFixed(2), style: TextStyle(color: color, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const Divider(),
-            Column(
-              children: List.generate(s.parts.length, (i) {
-                final p = s.parts[i];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(p.label)),
-                      SizedBox(
-                        width: 64,
-                        child: TextFormField(
-                          initialValue: p.score.toStringAsFixed(1),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          decoration: const InputDecoration(isDense: true),
-                          onChanged: (v) {
-                            final val = double.tryParse(v.replaceAll(',', '.')) ?? p.score;
-                            onPartEdit(s, i, val);
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (_, __) {
+            return Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              ),
+              child: Column(
+                children: [
+                  Container(width: 40, height: 4, decoration: BoxDecoration(
+                    color: Colors.grey.shade400, borderRadius: BorderRadius.circular(99),
+                  )),
+                  const SizedBox(height: 8),
+                  const Text('التعليقات', style: TextStyle(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 8),
+                  Expanded(
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: commentsCol.snapshots(),
+                      builder: (_, snap) {
+                        if (!snap.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                        final cs = snap.data!.docs;
+                        if (cs.isEmpty) {
+                          return const Center(child: Text('لا تعليقات بعد.'));
+                        }
+                        return ListView.separated(
+                          itemCount: cs.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, i) {
+                            final m = cs[i].data() as Map<String, dynamic>;
+                            return ListTile(
+                              leading: const Icon(Icons.person_outline),
+                              title: Text(m['author'] ?? 'مجهول'),
+                              subtitle: Text(m['text'] ?? ''),
+                            );
                           },
+                        );
+                      },
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: ctrl,
+                          decoration: const InputDecoration(
+                            isDense: true, hintText: 'اكتب تعليقًا…', border: OutlineInputBorder(),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Text("x${(p.weight * 100).toInt()}%"),
+                      FilledButton(
+                        onPressed: () async {
+                          await onAdd(ctrl.text);
+                          ctrl.clear();
+                        },
+                        child: const Text('إرسال'),
+                      ),
                     ],
                   ),
-                );
-              }),
-            ),
+                ],
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+// ============================================================================
+// PART 5/5 — Helpers + Notes
+// ============================================================================
+
+// امتداد صغير لقصّ النص بأمان (استُخدم في مسودات المجتمع)
+extension StringPreview on String {
+  String takeSafe(int n) => (length <= n) ? this : substring(0, n);
+}
+
+// ودجت حالة فارغة (إن احتجتها مستقبلًا)
+class EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  const EmptyState({super.key, required this.icon, required this.title, this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 56, color: Colors.grey.shade500),
+            const SizedBox(height: 10),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+            if (subtitle != null) ...[
+              const SizedBox(height: 6),
+              Text(subtitle!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
+            ],
           ],
         ),
       ),
@@ -1284,236 +2473,84 @@ class _SubjectCard extends StatelessWidget {
   }
 }
 
-// --------------------------- SETTINGS & PRESETS ------------------------------
-class SettingsScreenPro extends StatefulWidget {
-  final TermData term;
-  final ValueChanged<TermData> onApplyTerm;
+// ملاحظة: في CommunityScreen استخدمنا takeSafe بدلاً من take:
+/// داخل _loadDrafts() في الجزء 4/5، إن أردت دقّة كاملة، استبدل:
+///   title: Text((m['text'] as String?)?.take(80) ?? ''),
+/// بـ:
+///   title: Text(((m['text'] ?? '') as String).toString().takeSafe(80)),
 
-  const SettingsScreenPro({
-    super.key,
-    required this.term,
-    required this.onApplyTerm,
-  });
-
-  @override
-  State<SettingsScreenPro> createState() => _SettingsScreenProState();
-}
-
-class _SettingsScreenProState extends State<SettingsScreenPro> {
-  late TermData _local;
-
-  @override
-  void initState() {
-    super.initState();
-    _local = widget.term.copy();
-  }
-
-  void _applySystemPreset(TermSystem sys) {
-    setState(() => _local = _local..system = sys);
-    widget.onApplyTerm(_local.copy());
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("تم تطبيق إعدادات النظام")),
-    );
-  }
-
-  void _applyTemplate(TermData t) {
-    setState(() => _local = t.copy());
-    widget.onApplyTerm(_local.copy());
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("تم تطبيق القالب: ${t.label}")),
-    );
-  }
-
-  Future<void> _exportJSON() async {
-    final map = encodeTerm(_local);
-    final jsonStr = const JsonEncoder.withIndent('  ').convert(map);
-    await Clipboard.setData(ClipboardData(text: jsonStr));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("تم نسخ JSON إلى الحافظة")),
-    );
-  }
-
-  Future<void> _importJSON() async {
-    final controller = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text("Import JSON"),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: TextField(
-            controller: controller,
-            maxLines: 12,
-            decoration: const InputDecoration(hintText: "ألصق JSON هنا…"),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text("Import")),
-        ],
-      ),
-    );
-    if (ok == true) {
-      try {
-        final map = json.decode(controller.text) as Map<String, dynamic>;
-        final term = decodeTerm(map);
-        _applyTemplate(term);
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("JSON غير صالح: $e")),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final avg = termAverage(_local);
-    return ListView(
-      padding: const EdgeInsets.all(14),
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(14.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("System Presets", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _PresetButton(
-                      label: "DZ Default",
-                      onTap: () => _applySystemPreset(
-                        _local.system.copyWith(passThreshold: 10.0, hasResit: true, roundTo: 2),
-                      ),
-                    ),
-                    _PresetButton(
-                      label: "Strict 12",
-                      onTap: () => _applySystemPreset(
-                        _local.system.copyWith(passThreshold: 12.0, hasResit: false, roundTo: 2),
-                      ),
-                    ),
-                    _PresetButton(
-                      label: "Rounded 1dp",
-                      onTap: () => _applySystemPreset(
-                        _local.system.copyWith(roundTo: 1),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(Icons.analytics_outlined, color: kFachubBlue),
-                    const SizedBox(width: 8),
-                    Text("المتوسط الحالي: ${avg.toStringAsFixed(_local.system.roundTo)}"),
-                    const Spacer(),
-                    const Icon(Icons.check_circle, color: kFachubGreen),
-                    const SizedBox(width: 6),
-                    Text("النجاح ≥ ${_local.system.passThreshold.toStringAsFixed(1)}"),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(14.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Templates", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _PresetButton(label: "CS (DZ) S1", onTap: () => _applyTemplate(templateDZ_CS_S1())),
-                    _PresetButton(label: "Economics S1", onTap: () => _applyTemplate(templateEconomics_S1())),
-                    _PresetButton(label: "Reset Sample", onTap: () => _applyTemplate(sampleTerm())),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(14.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("Backup / Restore", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 8),
-                Wrap( // يمنع overflow على الشاشات الصغيرة
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: _exportJSON,
-                      icon: const Icon(Icons.download_outlined),
-                      label: const Text("Export JSON"),
-                    ),
-                    OutlinedButton.icon(
-                      onPressed: _importJSON,
-                      icon: const Icon(Icons.upload_outlined),
-                      label: const Text("Import JSON"),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _PresetButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _PresetButton({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(onPressed: onTap, child: Text(label));
-  }
-}
-
-// ------------------------------ TEMPLATES ------------------------------------
-TermData templateDZ_CS_S1() => TermData(
-  label: "S1 CS (DZ)",
-  system: const TermSystem(passThreshold: 10, hasResit: true, roundTo: 2),
-  subjects: [
-    Subject(id: "math", name: "Math", coeff: 4, eliminatory: true, eliminatoryThreshold: 7, parts: [
-      SubjectPart(label: "TD", weight: 0.3, score: 0),
-      SubjectPart(label: "EXAM", weight: 0.7, score: 0),
-    ]),
-    Subject(id: "algo", name: "Algorithms", coeff: 3, eliminatory: true, eliminatoryThreshold: 7, parts: [
-      SubjectPart(label: "TP", weight: 0.4, score: 0),
-      SubjectPart(label: "EXAM", weight: 0.6, score: 0),
-    ]),
-  ],
-);
-
-TermData templateEconomics_S1() => TermData(
-  label: "S1 Economics",
-  system: const TermSystem(passThreshold: 10, hasResit: true, roundTo: 2),
-  subjects: [
-    Subject(id: "eco", name: "Microeconomics", coeff: 3, eliminatory: false, parts: [
-      SubjectPart(label: "TD", weight: 0.4, score: 0),
-      SubjectPart(label: "EXAM", weight: 0.6, score: 0),
-    ]),
-    Subject(id: "stat", name: "Statistics", coeff: 3, eliminatory: false, parts: [
-      SubjectPart(label: "TD", weight: 0.5, score: 0),
-      SubjectPart(label: "EXAM", weight: 0.5, score: 0),
-    ]),
-  ],
-);
+// ---------------------------------------------------------------------------
+// ملاحظات إعداد Firestore/Storage (مرجعية سريعة):
+// ---------------------------------------------------------------------------
+//
+// 1) القواعد (Rules) — مثال مناسب للاختبار (عدّلها للإنتاج):
+//
+// Firestore:
+// rules_version = '2';
+// service cloud.firestore {
+//   match /databases/{database}/documents {
+//     function authed() { return request.auth != null; }
+//     match /users/{uid}/dz_custom_templates/{doc} {
+//       allow read, write: if authed() && uid == request.auth.uid;
+//     }
+//     match /messages/{doc} {
+//       allow read: if authed();
+//       allow create: if authed();
+//       allow update, delete: if false;
+//     }
+//     match /posts/{doc} {
+//       allow read: if authed();
+//       allow create: if authed();
+//       allow update: if false;
+//       allow delete: if false;
+//       match /likes/{likeId} {
+//         allow read, write: if authed();
+//       }
+//       match /comments/{c} {
+//         allow read, write: if authed();
+//       }
+//     }
+//   }
+// }
+//
+// Storage:
+// rules_version = '2';
+// service firebase.storage {
+//   match /b/{bucket}/o {
+//     function authed() { return request.auth != null; }
+//     match /chat_uploads/{uid}/{file} {
+//       allow read, write: if authed() && uid == request.auth.uid;
+//     }
+//     match /posts/{uid}/{file} {
+//       allow read: if authed();
+//       allow write: if authed() && uid == request.auth.uid;
+//     }
+//   }
+// }
+//
+// 2) المسارات المستخدمة:
+//    - رسائل الشات:        collection('messages')
+//    - منشورات المجتمع:    collection('posts') + subcollections('likes','comments')
+//    - قوالبك المخصّصة:    users/{uid}/dz_custom_templates
+//    - رفع ملفات الشات:    storage path: chat_uploads/{uid}/timestamp.ext
+//    - صور المنشورات:      storage path: posts/{uid}/timestamp_filename.ext
+//
+// 3) الأصول (Assets):
+//    ضع كامل محتويات القوالب الموسّعة داخل: assets/templates_dz/  (مع index.json)
+//    وتأكد من إضافة:
+//    flutter:
+//      assets:
+//        - assets/templates_dz/
+//
+// 4) الحزم في pubspec.yaml (تذكير):
+//    firebase_core, cloud_firestore, firebase_auth, firebase_storage,
+//    shared_preferences, file_selector, pdf, printing
+//
+// 5) Firebase initialization:
+//    استعملت import 'firebase_options.dart'; الناتج من أمر flutterfire.
+//    تأكد من تشغيل: flutterfire configure
+//
+// 6) الألوان وهوية الواجهة:
+//    الأخضر والأزرق مستخدمان (kFachubGreen, kFachubBlue). يمكنك ضبط ThemeData إن رغبت.
+//
+// ============================== END OF main.dart =============================

@@ -1,0 +1,38 @@
+{
+  "title": "LANG_EN • L1 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "Grammar",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "Literature",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "Writing",
+      "coef": 2,
+      "weights": {
+        "CC": 60,
+        "EXAM": 40
+      }
+    },
+    {
+      "name": "ICT",
+      "coef": 2,
+      "weights": {
+        "CC": 60,
+        "EXAM": 40
+      }
+    }
+  ]
+}

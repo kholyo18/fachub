@@ -1,0 +1,38 @@
+{
+  "title": "ECONOMIE • L1 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "اقتصاد جزئي",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "رياضيات اقتصادية",
+      "coef": 3,
+      "weights": {
+        "TD": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "محاسبة",
+      "coef": 2,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "منهجية",
+      "coef": 2,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    }
+  ]
+}

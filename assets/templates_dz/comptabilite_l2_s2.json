@@ -1,0 +1,38 @@
+{
+  "title": "COMPTABILITE • L2 S2",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "محاسبة تحليلية 2",
+      "coef": 4,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "ضرائب 2",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "إحصاء 2",
+      "coef": 2,
+      "weights": {
+        "TD": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "تواصل 2",
+      "coef": 1,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    }
+  ]
+}

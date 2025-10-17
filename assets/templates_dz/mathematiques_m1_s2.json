@@ -1,0 +1,38 @@
+{
+  "title": "MATHEMATIQUES • M1 S2",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "جبر 2",
+      "coef": 4,
+      "weights": {
+        "TD": 30,
+        "EXAM": 70
+      }
+    },
+    {
+      "name": "جبر 2",
+      "coef": 4,
+      "weights": {
+        "TD": 30,
+        "EXAM": 70
+      }
+    },
+    {
+      "name": "إحصاء 2",
+      "coef": 2,
+      "weights": {
+        "TD": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "معلوماتية 2",
+      "coef": 1,
+      "weights": {
+        "TP": 50,
+        "EXAM": 50
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "title": "LANG_FR • M2 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "Linguistique 1",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "Littérature 1",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "Expression écrite 1",
+      "coef": 2,
+      "weights": {
+        "CC": 60,
+        "EXAM": 40
+      }
+    },
+    {
+      "name": "Méthodologie 1",
+      "coef": 2,
+      "weights": {
+        "CC": 60,
+        "EXAM": 40
+      }
+    }
+  ]
+}

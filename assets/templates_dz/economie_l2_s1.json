@@ -1,0 +1,38 @@
+{
+  "title": "ECONOMIE • L2 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "كلي 1",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "رياضيات اقتصادية 1",
+      "coef": 3,
+      "weights": {
+        "TD": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "تسويق 1",
+      "coef": 2,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "تواصل 1",
+      "coef": 2,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    }
+  ]
+}

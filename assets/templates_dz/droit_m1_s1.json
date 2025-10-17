@@ -1,0 +1,38 @@
+{
+  "title": "DROIT • M1 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "إداري 1",
+      "coef": 4,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "مدني 1",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "مصطلحية 1",
+      "coef": 2,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "لغة أجنبية 1",
+      "coef": 1,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    }
+  ]
+}

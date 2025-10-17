@@ -1,0 +1,38 @@
+{
+  "title": "PSYCHOLOGIE • L3 S2",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "علم نفس عام 2",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "إرشادي 2",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "منهجية 2",
+      "coef": 2,
+      "weights": {
+        "TD": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "تواصل 2",
+      "coef": 2,
+      "weights": {
+        "CC": 60,
+        "EXAM": 40
+      }
+    }
+  ]
+}

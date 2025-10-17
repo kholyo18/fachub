@@ -1,0 +1,38 @@
+{
+  "title": "INFORMATIQUE • M1 S2",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "رياضيات 2",
+      "coef": 4,
+      "weights": {
+        "TD": 30,
+        "EXAM": 70
+      }
+    },
+    {
+      "name": "برمجة 2",
+      "coef": 3,
+      "weights": {
+        "TP": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "نظم 2",
+      "coef": 3,
+      "weights": {
+        "TP": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "لغة أجنبية 2",
+      "coef": 1,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    }
+  ]
+}

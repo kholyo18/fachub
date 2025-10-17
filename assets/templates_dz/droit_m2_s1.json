@@ -1,0 +1,38 @@
+{
+  "title": "DROIT • M2 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "قانون دستوري 1",
+      "coef": 4,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "مدني 1",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "مناهج 1",
+      "coef": 2,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "لغة أجنبية 1",
+      "coef": 1,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    }
+  ]
+}

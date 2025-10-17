@@ -1,0 +1,38 @@
+{
+  "title": "GESTION • M2 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "مدخل للتسيير 1",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "اقتصاد 1",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "تسويق 1",
+      "coef": 2,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "منهجية 1",
+      "coef": 2,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    }
+  ]
+}

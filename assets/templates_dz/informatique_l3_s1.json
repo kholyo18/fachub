@@ -1,0 +1,38 @@
+{
+  "title": "INFORMATIQUE • L3 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "رياضيات 1",
+      "coef": 4,
+      "weights": {
+        "TD": 30,
+        "EXAM": 70
+      }
+    },
+    {
+      "name": "برمجة 1",
+      "coef": 3,
+      "weights": {
+        "TP": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "نظم 1",
+      "coef": 3,
+      "weights": {
+        "TP": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "لغة أجنبية 1",
+      "coef": 1,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    }
+  ]
+}

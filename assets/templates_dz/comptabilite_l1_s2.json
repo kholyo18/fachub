@@ -1,0 +1,38 @@
+{
+  "title": "COMPTABILITE • L1 S2",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "محاسبة مالية",
+      "coef": 4,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "قانون",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "إحصاء",
+      "coef": 2,
+      "weights": {
+        "TD": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "لغة",
+      "coef": 1,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    }
+  ]
+}

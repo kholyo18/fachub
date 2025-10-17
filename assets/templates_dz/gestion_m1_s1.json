@@ -1,0 +1,38 @@
+{
+  "title": "GESTION • M1 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "مالية 1",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "اقتصاد 1",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "قانون 1",
+      "coef": 2,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "منهجية 1",
+      "coef": 2,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    }
+  ]
+}

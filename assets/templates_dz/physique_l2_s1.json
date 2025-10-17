@@ -1,0 +1,38 @@
+{
+  "title": "PHYSIQUE • L2 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "كهرباء 1",
+      "coef": 4,
+      "weights": {
+        "TD": 30,
+        "EXAM": 70
+      }
+    },
+    {
+      "name": "كهرومغناطيسية 1",
+      "coef": 3,
+      "weights": {
+        "TD": 30,
+        "EXAM": 70
+      }
+    },
+    {
+      "name": "أعمال تطبيقية 1",
+      "coef": 2,
+      "weights": {
+        "TP": 60,
+        "EXAM": 40
+      }
+    },
+    {
+      "name": "ثقافة 1",
+      "coef": 1,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    }
+  ]
+}

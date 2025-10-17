@@ -1,0 +1,38 @@
+{
+  "title": "PSYCHOLOGIE • L2 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "نمو 1",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "علم نفس اجتماعي 1",
+      "coef": 3,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "منهجية 1",
+      "coef": 2,
+      "weights": {
+        "TD": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "تواصل 1",
+      "coef": 2,
+      "weights": {
+        "CC": 60,
+        "EXAM": 40
+      }
+    }
+  ]
+}

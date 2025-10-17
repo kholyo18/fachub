@@ -1,0 +1,38 @@
+{
+  "title": "DROIT • L1 S1",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "قانون دستوري",
+      "coef": 4,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "مدني",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "مصطلحية",
+      "coef": 2,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    },
+    {
+      "name": "لغة أجنبية",
+      "coef": 1,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    }
+  ]
+}

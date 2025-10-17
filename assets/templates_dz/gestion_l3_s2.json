@@ -1,0 +1,38 @@
+{
+  "title": "GESTION • L3 S2",
+  "success_threshold": 10.0,
+  "subjects": [
+    {
+      "name": "مدخل للتسيير 2",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "محاسبة 2",
+      "coef": 3,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "قانون 2",
+      "coef": 2,
+      "weights": {
+        "CC": 40,
+        "EXAM": 60
+      }
+    },
+    {
+      "name": "تواصل 2",
+      "coef": 2,
+      "weights": {
+        "CC": 50,
+        "EXAM": 50
+      }
+    }
+  ]
+}

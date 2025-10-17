@@ -1,0 +1,161 @@
+{
+  "generated_at": "2025-10-17T12:57:20.760749Z",
+  "majors": {
+    "informatique": {
+      "L1_S1": "informatique_l1_s1.json",
+      "L1_S2": "informatique_l1_s2.json",
+      "L2_S1": "informatique_l2_s1.json",
+      "L2_S2": "informatique_l2_s2.json",
+      "L3_S1": "informatique_l3_s1.json",
+      "L3_S2": "informatique_l3_s2.json",
+      "M1_S1": "informatique_m1_s1.json",
+      "M1_S2": "informatique_m1_s2.json",
+      "M2_S1": "informatique_m2_s1.json",
+      "M2_S2": "informatique_m2_s2.json"
+    },
+    "mathematiques": {
+      "L1_S1": "mathematiques_l1_s1.json",
+      "L1_S2": "mathematiques_l1_s2.json",
+      "L2_S1": "mathematiques_l2_s1.json",
+      "L2_S2": "mathematiques_l2_s2.json",
+      "L3_S1": "mathematiques_l3_s1.json",
+      "L3_S2": "mathematiques_l3_s2.json",
+      "M1_S1": "mathematiques_m1_s1.json",
+      "M1_S2": "mathematiques_m1_s2.json",
+      "M2_S1": "mathematiques_m2_s1.json",
+      "M2_S2": "mathematiques_m2_s2.json"
+    },
+    "physique": {
+      "L1_S1": "physique_l1_s1.json",
+      "L1_S2": "physique_l1_s2.json",
+      "L2_S1": "physique_l2_s1.json",
+      "L2_S2": "physique_l2_s2.json",
+      "L3_S1": "physique_l3_s1.json",
+      "L3_S2": "physique_l3_s2.json",
+      "M1_S1": "physique_m1_s1.json",
+      "M1_S2": "physique_m1_s2.json",
+      "M2_S1": "physique_m2_s1.json",
+      "M2_S2": "physique_m2_s2.json"
+    },
+    "chimie": {
+      "L1_S1": "chimie_l1_s1.json",
+      "L1_S2": "chimie_l1_s2.json",
+      "L2_S1": "chimie_l2_s1.json",
+      "L2_S2": "chimie_l2_s2.json",
+      "L3_S1": "chimie_l3_s1.json",
+      "L3_S2": "chimie_l3_s2.json",
+      "M1_S1": "chimie_m1_s1.json",
+      "M1_S2": "chimie_m1_s2.json",
+      "M2_S1": "chimie_m2_s1.json",
+      "M2_S2": "chimie_m2_s2.json"
+    },
+    "biologie": {
+      "L1_S1": "biologie_l1_s1.json",
+      "L1_S2": "biologie_l1_s2.json",
+      "L2_S1": "biologie_l2_s1.json",
+      "L2_S2": "biologie_l2_s2.json",
+      "L3_S1": "biologie_l3_s1.json",
+      "L3_S2": "biologie_l3_s2.json",
+      "M1_S1": "biologie_m1_s1.json",
+      "M1_S2": "biologie_m1_s2.json",
+      "M2_S1": "biologie_m2_s1.json",
+      "M2_S2": "biologie_m2_s2.json"
+    },
+    "economie": {
+      "L1_S1": "economie_l1_s1.json",
+      "L1_S2": "economie_l1_s2.json",
+      "L2_S1": "economie_l2_s1.json",
+      "L2_S2": "economie_l2_s2.json",
+      "L3_S1": "economie_l3_s1.json",
+      "L3_S2": "economie_l3_s2.json",
+      "M1_S1": "economie_m1_s1.json",
+      "M1_S2": "economie_m1_s2.json",
+      "M2_S1": "economie_m2_s1.json",
+      "M2_S2": "economie_m2_s2.json"
+    },
+    "gestion": {
+      "L1_S1": "gestion_l1_s1.json",
+      "L1_S2": "gestion_l1_s2.json",
+      "L2_S1": "gestion_l2_s1.json",
+      "L2_S2": "gestion_l2_s2.json",
+      "L3_S1": "gestion_l3_s1.json",
+      "L3_S2": "gestion_l3_s2.json",
+      "M1_S1": "gestion_m1_s1.json",
+      "M1_S2": "gestion_m1_s2.json",
+      "M2_S1": "gestion_m2_s1.json",
+      "M2_S2": "gestion_m2_s2.json"
+    },
+    "comptabilite": {
+      "L1_S1": "comptabilite_l1_s1.json",
+      "L1_S2": "comptabilite_l1_s2.json",
+      "L2_S1": "comptabilite_l2_s1.json",
+      "L2_S2": "comptabilite_l2_s2.json",
+      "L3_S1": "comptabilite_l3_s1.json",
+      "L3_S2": "comptabilite_l3_s2.json",
+      "M1_S1": "comptabilite_m1_s1.json",
+      "M1_S2": "comptabilite_m1_s2.json",
+      "M2_S1": "comptabilite_m2_s1.json",
+      "M2_S2": "comptabilite_m2_s2.json"
+    },
+    "droit": {
+      "L1_S1": "droit_l1_s1.json",
+      "L1_S2": "droit_l1_s2.json",
+      "L2_S1": "droit_l2_s1.json",
+      "L2_S2": "droit_l2_s2.json",
+      "L3_S1": "droit_l3_s1.json",
+      "L3_S2": "droit_l3_s2.json",
+      "M1_S1": "droit_m1_s1.json",
+      "M1_S2": "droit_m1_s2.json",
+      "M2_S1": "droit_m2_s1.json",
+      "M2_S2": "droit_m2_s2.json"
+    },
+    "lang_arabe": {
+      "L1_S1": "lang_arabe_l1_s1.json",
+      "L1_S2": "lang_arabe_l1_s2.json",
+      "L2_S1": "lang_arabe_l2_s1.json",
+      "L2_S2": "lang_arabe_l2_s2.json",
+      "L3_S1": "lang_arabe_l3_s1.json",
+      "L3_S2": "lang_arabe_l3_s2.json",
+      "M1_S1": "lang_arabe_m1_s1.json",
+      "M1_S2": "lang_arabe_m1_s2.json",
+      "M2_S1": "lang_arabe_m2_s1.json",
+      "M2_S2": "lang_arabe_m2_s2.json"
+    },
+    "lang_fr": {
+      "L1_S1": "lang_fr_l1_s1.json",
+      "L1_S2": "lang_fr_l1_s2.json",
+      "L2_S1": "lang_fr_l2_s1.json",
+      "L2_S2": "lang_fr_l2_s2.json",
+      "L3_S1": "lang_fr_l3_s1.json",
+      "L3_S2": "lang_fr_l3_s2.json",
+      "M1_S1": "lang_fr_m1_s1.json",
+      "M1_S2": "lang_fr_m1_s2.json",
+      "M2_S1": "lang_fr_m2_s1.json",
+      "M2_S2": "lang_fr_m2_s2.json"
+    },
+    "lang_en": {
+      "L1_S1": "lang_en_l1_s1.json",
+      "L1_S2": "lang_en_l1_s2.json",
+      "L2_S1": "lang_en_l2_s1.json",
+      "L2_S2": "lang_en_l2_s2.json",
+      "L3_S1": "lang_en_l3_s1.json",
+      "L3_S2": "lang_en_l3_s2.json",
+      "M1_S1": "lang_en_m1_s1.json",
+      "M1_S2": "lang_en_m1_s2.json",
+      "M2_S1": "lang_en_m2_s1.json",
+      "M2_S2": "lang_en_m2_s2.json"
+    },
+    "psychologie": {
+      "L1_S1": "psychologie_l1_s1.json",
+      "L1_S2": "psychologie_l1_s2.json",
+      "L2_S1": "psychologie_l2_s1.json",
+      "L2_S2": "psychologie_l2_s2.json",
+      "L3_S1": "psychologie_l3_s1.json",
+      "L3_S2": "psychologie_l3_s2.json",
+      "M1_S1": "psychologie_m1_s1.json",
+      "M1_S2": "psychologie_m1_s2.json",
+      "M2_S1": "psychologie_m2_s1.json",
+      "M2_S2": "psychologie_m2_s2.json"
+    }
+  }
+}
