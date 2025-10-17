@@ -16,11 +16,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'firebase_options.dart';
 
-// اختيار ملفات
+// اختيار ملفات (بديل file_picker)
 // import 'package:file_picker/file_picker.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:path_provider/path_provider.dart';
-
 
 // ------------------------------- CONSTS --------------------------------------
 const kFachubGreen = Color(0xFF16A34A);
@@ -560,7 +559,6 @@ class FirebaseStore implements IDataStore {
 // ======================= Fachub (main.dart) — FINAL (Part 2/3) =======================
 
 // ------------------------------ SYNC MANAGER ----------------------------------
-// يرفع الرسائل المعلّقة (والملفات) إلى Firebase عندما يتوفر الإنترنت
 class SyncManager {
   final FirebaseStore firebase;
   SyncManager({required this.firebase});
@@ -570,9 +568,9 @@ class SyncManager {
     if (pending.isEmpty) return 0;
 
     for (final p in pending) {
-      String textToSend = p.text;
+      var textToSend = p.text;
 
-      // لو عندنا مرفق محفوظ محليًا — ارفعه ثم أرسل الرابط
+      // لو فيه مرفق محلي، ارفعه ثم استبدل النص بالرابط
       if (p.localPath != null &&
           p.localPath!.isNotEmpty &&
           File(p.localPath!).existsSync()) {
@@ -581,7 +579,6 @@ class SyncManager {
         final ref = FirebaseStorage.instance
             .ref()
             .child('uploads/${p.channelId}/${DateTime.now().millisecondsSinceEpoch}_$name');
-
         await ref.putFile(file);
         final url = await ref.getDownloadURL();
         textToSend = "📎 $name\n$url";
@@ -615,13 +612,12 @@ class _HomeShellState extends State<HomeShell> {
     store = widget.isOnline ? FirebaseStore() : LocalStore();
     _loadTerm();
 
-    // مزامنة الرسائل المعلّقة عند الاتصال
     if (widget.isOnline && store is FirebaseStore) {
       final sync = SyncManager(firebase: store as FirebaseStore);
       sync.flushPending().then((n) {
         if (!mounted || n <= 0) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("تمت مزامنة $n رسالة معلّقة إلى السحابة")),
+          SnackBar(content: Text("تمت مزامنة $n رسالة معلّقة")),
         );
       });
     }
@@ -685,7 +681,6 @@ class _BrandMark extends StatelessWidget {
 }
 
 // ------------------------------ Chat Screen ----------------------------------
-
 class ChatScreen extends StatefulWidget {
   final IDataStore store;
   final bool isOnline;
@@ -701,7 +696,6 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _composer = TextEditingController();
   final ScrollController _scroll = ScrollController();
 
-  // لوحة إيموجي بسيطة
   final List<String> _emojis = [
     "😀","😁","😂","🤣","😊","😍","😘","😎","🤩",
     "👍","👏","🙏","🔥","💯","🎉","✅","❗","❓",
@@ -796,7 +790,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // فتح لوحة الإيموجي
   void _openEmojiPicker() {
     showModalBottomSheet(
       context: context,
@@ -809,7 +802,8 @@ class _ChatScreenState extends State<ChatScreen> {
               spacing: 10, runSpacing: 10,
               children: _emojis.map((e) => InkWell(
                 onTap: () {
-                  _composer.text = _composer.text + (_composer.text.isEmpty ? "" : " ") + e;
+                  _composer.text =
+                      _composer.text + (_composer.text.isEmpty ? "" : " ") + e;
                   _composer.selection = TextSelection.fromPosition(
                     TextPosition(offset: _composer.text.length),
                   );
@@ -832,34 +826,43 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  // إرفاق ملف: Online يرفع إلى Firebase Storage، Offline يخزن في PendingQueue
+  // -------- إرفاق ملف باستخدام file_selector (متوافق مع Flutter 3.24+) ------
   Future<void> _attachFile() async {
     if (_current == null) return;
 
-    final res = await FilePicker.platform.pickFiles(withReadStream: false);
-    if (res == null || res.files.isEmpty) return;
+    // نقبل أي نوع (ممكن تخصص الامتدادات لاحقًا)
+    final typeGroup = XTypeGroup(label: 'any');
+    final XFile? xfile = await openFile(acceptedTypeGroups: [typeGroup]);
+    if (xfile == null) return;
 
-    final file = res.files.single;
-    final path = file.path;
-    final name = file.name;
-    final mime = file.extension;
-
-    if (path == null) return;
+    final name = xfile.name;
+    final bytes = await xfile.readAsBytes();
 
     if (widget.isOnline) {
       try {
         final ref = FirebaseStorage.instance
             .ref()
             .child('uploads/${_current!.id}/${DateTime.now().millisecondsSinceEpoch}_$name');
-        await ref.putFile(File(path));
+
+        await ref.putData(bytes);
         final url = await ref.getDownloadURL();
 
-        await widget.store.sendMessage(_current!.id, "📎 $name\n$url", sender: "Khaled");
+        await widget.store
+            .sendMessage(_current!.id, "📎 $name\n$url", sender: "Khaled");
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("فشل الرفع: $e")));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("فشل الرفع: $e")),
+        );
       }
     } else {
-      // Offline: خزّن في قائمة الانتظار فقط + أعلم المستخدم
+      // Offline: خزّن الملف مؤقتًا وسجّل مساره في PendingQueue
+      final dir = await getTemporaryDirectory();
+      final path =
+          '${dir.path}/${DateTime.now().millisecondsSinceEpoch}_$name';
+      final f = File(path);
+      await f.writeAsBytes(bytes);
+
       await PendingQueue.push(PendingMessage(
         channelId: _current!.id,
         sender: "Khaled",
@@ -867,7 +870,7 @@ class _ChatScreenState extends State<ChatScreen> {
         time: DateTime.now(),
         localPath: path,
         fileName: name,
-        mimeType: mime,
+        mimeType: null,
       ));
 
       if (!mounted) return;
@@ -890,7 +893,6 @@ class _ChatScreenState extends State<ChatScreen> {
           onRename: _renameChannel,
           onDelete: _deleteChannel,
         ),
-        // قنوات الشات
         SizedBox(
           height: 56,
           child: StreamBuilder<List<ChatChannel>>(
@@ -924,7 +926,6 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
         const Divider(height: 1),
-        // الرسائل
         Expanded(
           child: _current == null
               ? const Center(child: Text("لا توجد قنوات حالياً. أنشئ قناة جديدة."))
@@ -942,7 +943,6 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
         ),
         const Divider(height: 1),
-        // محرّر الإرسال
         _ComposerBar(
           controller: _composer,
           onAttach: _attachFile,
@@ -955,7 +955,6 @@ class _ChatScreenState extends State<ChatScreen> {
 }
 
 // ------------------------------ Chat Widgets ---------------------------------
-
 class _ChatHeaderBar extends StatelessWidget {
   final bool isOnline;
   final ChatChannel? current;
@@ -1101,7 +1100,6 @@ class _ChatBubble extends StatelessWidget {
 }
 
 // --------------------------- New Channel Dialog -------------------------------
-
 class _NewChannelDialog extends StatefulWidget {
   const _NewChannelDialog();
 
@@ -1453,7 +1451,7 @@ class _SettingsScreenProState extends State<SettingsScreenPro> {
               children: [
                 const Text("Backup / Restore", style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
-                Wrap( // ✅ يمنع overflow على الشاشات الصغيرة
+                Wrap( // يمنع overflow على الشاشات الصغيرة
                   spacing: 8,
                   runSpacing: 8,
                   children: [
