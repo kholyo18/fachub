@@ -1,11 +1,8 @@
 // ============================================================================
-// Fachub — main.dart  (FULL, FIXED & ENHANCED) — PART 1/3
+// Fachub — main.dart (FULL)
 // ============================================================================
 
-import 'dart:io';
 import 'dart:typed_data';
-
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
@@ -23,9 +20,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-// Media & utils
+// Media picker
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 
 import 'firebase_options.dart';
 
@@ -33,7 +29,7 @@ import 'firebase_options.dart';
 // Branding
 // ============================================================================
 const kFachubGreen = Color(0xFF16434A);
-const kFachubBlue  = Color(0xFF2365EB);
+const kFachubBlue = Color(0xFF2365EB);
 
 // ============================================================================
 // Bootstrap
@@ -45,12 +41,12 @@ Future<void> main() async {
 }
 
 // ============================================================================
-// App root (Theme + Locale)  — ثابت ويعمل: تبديل اللغة/الثيم + حفظ التفضيلات
+// App root (Theme + Locale)
 // ============================================================================
 class FachubApp extends StatefulWidget {
   const FachubApp({super.key});
 
-  // للوصول للإعدادات من أي مكان (Drawer/Settings)
+  // لنداء تغيير الثيم/اللغة من أي مكان
   static _FachubAppState of(BuildContext context) =>
       context.findAncestorStateOfType<_FachubAppState>()!;
 
@@ -62,7 +58,7 @@ class _FachubAppState extends State<FachubApp> {
   ThemeMode _themeMode = ThemeMode.system;
   Locale _locale = const Locale('ar');
 
-  static const _kTheme  = 'pref_themeMode';
+  static const _kTheme = 'pref_themeMode';
   static const _kLocale = 'pref_locale';
 
   @override
@@ -75,7 +71,9 @@ class _FachubAppState extends State<FachubApp> {
     final p = await SharedPreferences.getInstance();
     final themeIdx = p.getInt(_kTheme);
     final lang = p.getString(_kLocale);
-    if (themeIdx != null && themeIdx >= 0 && themeIdx < ThemeMode.values.length) {
+    if (themeIdx != null &&
+        themeIdx >= 0 &&
+        themeIdx < ThemeMode.values.length) {
       _themeMode = ThemeMode.values[themeIdx];
     }
     if (lang != null && lang.isNotEmpty) {
@@ -123,7 +121,7 @@ class _FachubAppState extends State<FachubApp> {
 }
 
 // ============================================================================
-// Global End Drawer (يظهر بكل الشاشات الرئيسية)
+// Global End Drawer (appears in all main screens)
 // ============================================================================
 class AppEndDrawer extends StatelessWidget {
   const AppEndDrawer({super.key});
@@ -142,10 +140,8 @@ class AppEndDrawer extends StatelessWidget {
               decoration: const BoxDecoration(
                 gradient: LinearGradient(colors: [kFachubBlue, kFachubGreen]),
               ),
-              accountName: Text(
-                user?.email?.split('@').first ?? 'Guest',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
+              accountName: Text(user?.email?.split('@').first ?? 'Guest',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
               accountEmail: Text(user?.email ?? 'غير مسجّل'),
               currentAccountPicture: const CircleAvatar(
                 backgroundColor: Colors.white,
@@ -153,35 +149,29 @@ class AppEndDrawer extends StatelessWidget {
               ),
             ),
 
-            // ---------------- التنقّل العام ----------------
+            // تنقّل رئيسي
             ListTile(
               leading: const Icon(Icons.calculate_outlined),
               title: const Text('حاسبة المعدل'),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CalculatorScreen()),
-                );
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const CalculatorScreen()));
               },
             ),
             ListTile(
               leading: const Icon(Icons.public_outlined),
               title: const Text('المجتمع'),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CommunityScreen()),
-                );
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const CommunityScreen()));
               },
             ),
             ListTile(
               leading: const Icon(Icons.chat_bubble_outline),
               title: const Text('الشات'),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ChatScreen()),
-                );
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const ChatScreen()));
               },
             ),
             ListTile(
@@ -199,7 +189,7 @@ class AppEndDrawer extends StatelessWidget {
 
             const Divider(height: 24),
 
-            // ---------------- المظهر واللغة ----------------
+            // المظهر واللغة
             ListTile(
               leading: const Icon(Icons.color_lens_outlined),
               title: const Text('تغيير المظهر'),
@@ -231,25 +221,25 @@ class AppEndDrawer extends StatelessWidget {
 
             const Divider(height: 24),
 
-            // ---------------- الحساب ----------------
+            // الحساب
             if (user != null) ...[
               ListTile(
                 leading: const Icon(Icons.lock_reset),
                 title: const Text('إعادة تعيين كلمة المرور'),
-                subtitle: const Text('إرسال رابط لبريدك'),
                 onTap: () async {
                   try {
                     await FirebaseAuth.instance
                         .sendPasswordResetEmail(email: user.email!);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('تم إرسال رابط إعادة التعيين')),
+                        const SnackBar(
+                            content: Text('تم إرسال رابط إعادة التعيين')),
                       );
                     }
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('تعذّر الإرسال: $e')),
+                        SnackBar(content: Text('تعذر الإرسال: $e')),
                       );
                     }
                   }
@@ -281,7 +271,7 @@ class AppEndDrawer extends StatelessWidget {
 
             const Divider(height: 24),
 
-            // ---------------- حول ----------------
+            // حول
             ListTile(
               leading: const Icon(Icons.info_outline),
               title: const Text('حول التطبيق'),
@@ -415,7 +405,7 @@ class _LanguageSheet extends StatelessWidget {
 }
 
 // ============================================================================
-// PART 1/3 (تابع) — AuthGate + SignIn + BaseScaffold + Settings + Account
+// AuthGate + SignIn
 // ============================================================================
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -426,7 +416,8 @@ class AuthGate extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (ctx, snap) {
         if (snap.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
         }
         if (!snap.hasData) return const SignInScreen();
         return const HomeTabs();
@@ -537,7 +528,9 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 }
 
-// BaseScaffold — يضمن endDrawer في كل شاشة
+// ============================================================================
+// Base Scaffold (هيكل عام ثابت مع Drawer)
+// ============================================================================
 class BaseScaffold extends StatelessWidget {
   final String title;
   final Widget body;
@@ -563,6 +556,9 @@ class BaseScaffold extends StatelessWidget {
   }
 }
 
+// ============================================================================
+// Settings + Account
+// ============================================================================
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
@@ -658,302 +654,413 @@ class AccountScreen extends StatelessWidget {
 }
 
 // ============================================================================
-// يتبع في PART 2/3: المجتمع (كاملاً مع صور/وسوم/إعجابات) + الشات + HomeTabs
+// Community (PRO) — نص/صورة/وسوم + إعجاب + تعليقات + فرز + بحث
 // ============================================================================
-// ============================================================================
-// Fachub — main.dart  (FULL, FIXED & ENHANCED) — PART 2/3
-// ============================================================================
-
-// ----------------------------- نموذج منشور مجتمع -----------------------------
-class CommunityPost {
-  final String id;
-  final String text;
-  final String? imagePath; // على الموبايل فقط من ImagePicker
-  final DateTime createdAt;
-  int likes;
-  final List<String> tags;
-
-  CommunityPost({
-    required this.id,
-    required this.text,
-    this.imagePath,
-    required this.createdAt,
-    this.likes = 0,
-    this.tags = const [],
-  });
-}
-
-// ------------------------------- مجتمع الطلبة -------------------------------
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
-
   @override
   State<CommunityScreen> createState() => _CommunityScreenState();
 }
 
 class _CommunityScreenState extends State<CommunityScreen> {
-  final postCtrl = TextEditingController();
-  final tagCtrl  = TextEditingController();
-  final List<CommunityPost> _posts = [];
-  String? _pickedImagePath; // محلي من ImagePicker
-  String? _activeTag;       // للتصفية
+  final _postCtrl = TextEditingController();
+  final _tagsCtrl = TextEditingController();
+  XFile? _picked;
+  bool _asAnon = true;
+  String _order = 'latest'; // latest | top
+  String _queryTag = '';
 
-  // إضافة منشور
-  void _addPost() {
-    final txt = postCtrl.text.trim();
-    final rawTags = tagCtrl.text
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-
-    if (txt.isEmpty && _pickedImagePath == null) return;
-
-    setState(() {
-      _posts.insert(
-        0,
-        CommunityPost(
-          id: DateTime.now().microsecondsSinceEpoch.toString(),
-          text: txt,
-          imagePath: _pickedImagePath,
-          createdAt: DateTime.now(),
-          likes: 0,
-          tags: rawTags,
-        ),
+  Future<void> _pickImage() async {
+    try {
+      final p = ImagePicker();
+      final img =
+          await p.pickImage(source: ImageSource.gallery, imageQuality: 70);
+      if (img != null) setState(() => _picked = img);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('تعذّر اختيار صورة: $e')),
       );
-      postCtrl.clear();
-      tagCtrl.clear();
-      _pickedImagePath = null;
-    });
+    }
   }
 
-  // التقط صورة (موبايل فقط)
-  Future<void> _pickImage() async {
-    if (kIsWeb) {
+  Future<void> _createPost() async {
+    final text = _postCtrl.text.trim();
+    if (text.isEmpty && _picked == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('التقاط الصور غير مدعوم على الويب في هذا المثال')),
+        const SnackBar(content: Text('اكتب شيئًا أو أرفق صورة')),
       );
       return;
     }
-    try {
-      final picker = ImagePicker();
-      final img = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-      if (img != null) {
-        setState(() => _pickedImagePath = img.path);
-      }
-    } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('تعذّر اختيار الصورة')),
-      );
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    String? imageUrl;
+    if (_picked != null) {
+      final bytes = await _picked!.readAsBytes();
+      final path =
+          'posts/${user.uid}/${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final ref = FirebaseStorage.instance.ref(path);
+      await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+      imageUrl = await ref.getDownloadURL();
     }
+
+    final tags = _tagsCtrl.text
+        .split(RegExp(r'[ ,#]+'))
+        .where((t) => t.trim().isNotEmpty)
+        .map((t) => t.toLowerCase())
+        .toList();
+
+    await FirebaseFirestore.instance.collection('posts').add({
+      'text': text,
+      'image': imageUrl,
+      'tags': tags,
+      'uid': user.uid,
+      'author':
+          _asAnon ? 'طالب مجهول' : (user.email?.split('@').first ?? 'طالب'),
+      'created_at': FieldValue.serverTimestamp(),
+      'likes': 0,
+      'liked_by': <String>[],
+      'comments': 0,
+    });
+
+    setState(() {
+      _postCtrl.clear();
+      _tagsCtrl.clear();
+      _picked = null;
+    });
   }
 
-  void _toggleLike(CommunityPost p) {
-    setState(() => p.likes += 1);
+  Future<void> _toggleLike(String id, List likedBy, int likes) async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    final doc = FirebaseFirestore.instance.collection('posts').doc(id);
+    final has = likedBy.contains(uid);
+
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final snap = await tx.get(doc);
+      final data = snap.data()!;
+      final lb = List<String>.from(data['liked_by'] ?? []);
+      if (lb.contains(uid)) {
+        lb.remove(uid);
+      } else {
+        lb.add(uid);
+      }
+      final l = (data['likes'] ?? 0) + (has ? -1 : 1);
+      tx.update(doc, {'liked_by': lb, 'likes': l});
+    });
   }
 
-  List<CommunityPost> get _filtered {
-    if (_activeTag == null) return _posts;
-    return _posts.where((p) => p.tags.contains(_activeTag)).toList();
+  Future<void> _addComment(String postId) async {
+    final ctrl = TextEditingController();
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 16,
+          right: 16,
+          top: 16,
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(
+            controller: ctrl,
+            decoration: const InputDecoration(
+              labelText: 'اكتب تعليقًا...',
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton(
+            onPressed: () async {
+              final txt = ctrl.text.trim();
+              if (txt.isEmpty) return;
+              final col = FirebaseFirestore.instance
+                  .collection('posts')
+                  .doc(postId)
+                  .collection('comments');
+              await col.add({
+                'text': txt,
+                'uid': FirebaseAuth.instance.currentUser?.uid,
+                'created_at': FieldValue.serverTimestamp(),
+              });
+              await FirebaseFirestore.instance
+                  .collection('posts')
+                  .doc(postId)
+                  .update({'comments': FieldValue.increment(1)});
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('إرسال'),
+          ),
+          const SizedBox(height: 12),
+        ]),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final q = FirebaseFirestore.instance.collection('posts');
+    final base = _order == 'top'
+        ? q.orderBy('likes', descending: true).orderBy('created_at', descending: true)
+        : q.orderBy('created_at', descending: true);
+
+    final stream = _queryTag.isEmpty
+        ? base.snapshots()
+        : base
+            .where('tags', arrayContains: _queryTag.toLowerCase())
+            .snapshots();
+
     return BaseScaffold(
       title: 'المجتمع',
-      body: ListView(
-        padding: const EdgeInsets.all(12),
+      body: Column(
         children: [
           // صندوق إنشاء منشور
-          Card(
-            elevation: 1,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  TextField(
-                    controller: postCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'شارك سؤالًا أو تجربة أو معلومة...',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.edit),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _postCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        hintText: 'شارك سؤالًا أو تجربة أو معلومة...',
+                        border: OutlineInputBorder(),
+                        suffixIcon: Icon(Icons.edit_outlined),
+                      ),
                     ),
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: tagCtrl,
-                          decoration: const InputDecoration(
-                            hintText: 'وسوم مفصولة بفاصلة (مثال: L1, اقتصاد)',
-                            prefixIcon: Icon(Icons.tag),
-                            border: OutlineInputBorder(),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _tagsCtrl,
+                            decoration: const InputDecoration(
+                              hintText: 'وسوم مفصولة بمسافة…',
+                              prefixIcon: Icon(Icons.tag),
+                              border: OutlineInputBorder(),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: 'إرفاق صورة',
-                        onPressed: _pickImage,
-                        icon: const Icon(Icons.image_outlined),
-                      ),
-                      FilledButton.icon(
-                        onPressed: _addPost,
-                        icon: const Icon(Icons.send),
-                        label: const Text('نشر'),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: 'صورة',
+                          onPressed: _pickImage,
+                          icon: const Icon(Icons.image_outlined),
+                        ),
+                        const SizedBox(width: 4),
+                        Switch(
+                          value: _asAnon,
+                          onChanged: (v) => setState(() => _asAnon = v),
+                        ),
+                        const Text('مجهول'),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: _createPost,
+                          icon: const Icon(Icons.send),
+                          label: const Text('نشر'),
+                        ),
+                      ],
+                    ),
+                    if (_picked != null) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.photo, size: 18),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(_picked!.name)),
+                          IconButton(
+                            onPressed: () => setState(() => _picked = null),
+                            icon: const Icon(Icons.close),
+                          ),
+                        ],
                       ),
                     ],
-                  ),
-                  if (_pickedImagePath != null) ...[
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.file(File(_pickedImagePath!), height: 140, fit: BoxFit.cover),
-                    ),
                   ],
-                ],
+                ),
               ),
             ),
           ),
 
-          const SizedBox(height: 12),
-
-          // شريط التصفية بالوسوم
-          if (_posts.expand((p) => p.tags).isNotEmpty) ...[
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+          // شريط أدوات (ترتيب/بحث بالوسم)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
               children: [
-                ChoiceChip(
-                  label: const Text('الكل'),
-                  selected: _activeTag == null,
-                  onSelected: (_) => setState(() => _activeTag = null),
+                SegmentedButton<String>(
+                  segments: const [
+                    ButtonSegment(value: 'latest', label: Text('الأحدث')),
+                    ButtonSegment(value: 'top', label: Text('الأكثر إعجابًا')),
+                  ],
+                  selected: {_order},
+                  onSelectionChanged: (s) => setState(() => _order = s.first),
                 ),
-                ..._uniqueTags().map((t) => ChoiceChip(
-                      label: Text('#$t'),
-                      selected: _activeTag == t,
-                      onSelected: (_) => setState(() => _activeTag = t),
-                    )),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      hintText: 'ابحث بوسم (بدون #)…',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onChanged: (v) => setState(() => _queryTag = v.trim()),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 12),
-          ],
+          ),
 
-          if (_filtered.isEmpty)
-            EmptyHint(
-              icon: Icons.hourglass_empty_outlined,
-              title: 'لا توجد منشورات بعد',
-              subtitle: 'كن أول من يشارك منشورًا!',
-            )
-          else
-            ..._filtered.map(_postCard),
+          const SizedBox(height: 6),
+
+          // قائمة المنشورات
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: stream,
+              builder: (ctx, snap) {
+                if (!snap.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final docs = snap.data!.docs;
+                if (docs.isEmpty) {
+                  return EmptyHint(
+                    icon: Icons.hourglass_empty_outlined,
+                    title: 'لا توجد منشورات بعد',
+                    subtitle: 'كن أول من يشارك منشورًا!',
+                  );
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                  itemCount: docs.length,
+                  itemBuilder: (_, i) {
+                    final d = docs[i].data()! as Map<String, dynamic>;
+                    final id = docs[i].id;
+                    final likedBy = List<String>.from(d['liked_by'] ?? []);
+                    final mine = FirebaseAuth.instance.currentUser?.uid;
+                    final hasLiked = mine != null && likedBy.contains(mine);
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // رأس
+                            Row(
+                              children: [
+                                const CircleAvatar(child: Icon(Icons.person)),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(d['author'] ?? 'طالب',
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w600)),
+                                      Text(
+                                        _formatDate(d['created_at']),
+                                        style: const TextStyle(
+                                            color: Colors.grey, fontSize: 12),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuButton(
+                                  itemBuilder: (ctx) => const [
+                                    PopupMenuItem(
+                                        value: 'share',
+                                        child: Text('مشاركة الرابط')),
+                                  ],
+                                  onSelected: (v) {
+                                    if (v == 'share') {
+                                      final url = 'https://fachub/post/$id';
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(SnackBar(
+                                              content:
+                                                  Text('تم نسخ الرابط: $url')));
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+
+                            if ((d['text'] ?? '').toString().isNotEmpty)
+                              Text(d['text']),
+
+                            if ((d['image'] ?? '').toString().isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(d['image'],
+                                    fit: BoxFit.cover),
+                              ),
+                            ],
+
+                            if ((d['tags'] ?? []).isNotEmpty) ...[
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6,
+                                children: List<Widget>.from(
+                                  (d['tags'] as List).map(
+                                    (t) => ActionChip(
+                                      label: Text('#$t'),
+                                      onPressed: () =>
+                                          setState(() => _queryTag = t),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                IconButton(
+                                  onPressed: () => _toggleLike(
+                                      id, likedBy, d['likes'] ?? 0),
+                                  icon: Icon(hasLiked
+                                      ? Icons.favorite
+                                      : Icons.favorite_border),
+                                ),
+                                Text('${d['likes'] ?? 0} إعجاب'),
+                                const SizedBox(width: 16),
+                                IconButton(
+                                  onPressed: () => _addComment(id),
+                                  icon: const Icon(Icons.chat_bubble_outline),
+                                ),
+                                Text('${d['comments'] ?? 0} تعليق'),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Set<String> _uniqueTags() {
-    final tags = <String>{};
-    for (final p in _posts) {
-      tags.addAll(p.tags);
-    }
-    return tags;
-  }
-
-  Widget _postCard(CommunityPost p) {
-    final time = DateFormat('yyyy/MM/dd • HH:mm').format(p.createdAt);
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // رأس
-            Row(
-              children: [
-                const CircleAvatar(child: Icon(Icons.person)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'طالب مجهول',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ),
-                Text(time, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              ],
-            ),
-            const SizedBox(height: 8),
-            // نص
-            if (p.text.isNotEmpty) Text(p.text),
-            // صورة
-            if (p.imagePath != null) ...[
-              const SizedBox(height: 8),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.file(
-                  File(p.imagePath!),
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            // وسوم
-            if (p.tags.isNotEmpty)
-              Wrap(
-                spacing: 6,
-                children: p.tags
-                    .map((t) => InkWell(
-                          onTap: () => setState(() => _activeTag = t),
-                          child: Chip(
-                            label: Text('#$t'),
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                          ),
-                        ))
-                    .toList(),
-              ),
-            // أزرار
-            Row(
-              children: [
-                IconButton.filledTonal(
-                  onPressed: () => _toggleLike(p),
-                  icon: const Icon(Icons.favorite_border),
-                ),
-                Text('${p.likes} إعجاب'),
-                const Spacer(),
-                IconButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('ميزة التعليقات ستُضاف لاحقاً')),
-                    );
-                  },
-                  icon: const Icon(Icons.mode_comment_outlined),
-                ),
-                IconButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تم نسخ رابط المنشور (وهمي)')),
-                    );
-                  },
-                  icon: const Icon(Icons.share_outlined),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+  String _formatDate(dynamic ts) {
+    if (ts is! Timestamp) return '';
+    final d = ts.toDate();
+    return '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')} • ${d.year}/${d.month.toString().padLeft(2, '0')}/${d.day.toString().padLeft(2, '0')}';
   }
 }
 
-// ----------------------------------- الشات -----------------------------------
+// ============================================================================
+// الشات (محلي مبسّط)
+// ============================================================================
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
 
@@ -985,7 +1092,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ? EmptyHint(
                     icon: Icons.forum_outlined,
                     title: 'ابدأ المحادثة ✨',
-                    subtitle: 'أرسل أول رسالة الآن',
+                    subtitle: 'اكتب أول رسالة الآن.',
                   )
                 : ListView.builder(
                     reverse: true,
@@ -1023,7 +1130,9 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 }
 
-// ------------------------------ الواجهة الرئيسية ------------------------------
+// ============================================================================
+// الواجهة الرئيسية — شريط تنقّل سفلي + Drawer جانبي
+// ============================================================================
 class HomeTabs extends StatefulWidget {
   const HomeTabs({super.key});
 
@@ -1035,21 +1144,11 @@ class _HomeTabsState extends State<HomeTabs> {
   int _index = 0;
 
   final pages = const [
-    // سيتم تعريف CalculatorScreen في PART 3/3
-    Placeholder(), // مؤقتاً حتى يصل الجزء 3/3
+    CalculatorScreen(),
     CommunityScreen(),
     ChatScreen(),
     SettingsScreen(),
     AccountScreen(),
-  ];
-
-  final labels = const ['الحاسبة', 'المجتمع', 'الشات', 'الإعدادات', 'الحساب'];
-  final icons = const [
-    Icons.calculate_outlined,
-    Icons.public_outlined,
-    Icons.chat_bubble_outline,
-    Icons.settings_outlined,
-    Icons.person_outline,
   ];
 
   @override
@@ -1060,325 +1159,16 @@ class _HomeTabsState extends State<HomeTabs> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: List.generate(
-          labels.length,
-          (i) => NavigationDestination(icon: Icon(icons[i]), label: labels[i]),
-        ),
-      ),
-    );
-  }
-}
-// ============================================================================
-// Fachub — main.dart  (FULL, FIXED & ENHANCED) — PART 3/3
-// ============================================================================
-
-// ----------------------- بيانات هوية الشهادة (محلياً) ------------------------
-class CertificateIdentity {
-  static const _nameKey = 'student_name';
-  static const _univKey = 'student_university';
-
-  static Future<void> save(String name, String uni) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_nameKey, name);
-    await prefs.setString(_univKey, uni);
-  }
-
-  static Future<Map<String, String>> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    return {
-      'name': prefs.getString(_nameKey) ?? '',
-      'uni': prefs.getString(_univKey) ?? '',
-    };
-  }
-}
-
-// --------------------------- شاشة الحاسبة المتقدّمة --------------------------
-class CalculatorScreen extends StatefulWidget {
-  const CalculatorScreen({super.key});
-
-  @override
-  State<CalculatorScreen> createState() => _CalculatorScreenState();
-}
-
-class _CalculatorScreenState extends State<CalculatorScreen> {
-  final subjects = <Map<String, dynamic>>[];
-  double threshold = 10;
-  double avg = 0;
-
-  // إضافة مادة
-  void _add() {
-    setState(() {
-      subjects.add({'name': 'مادة جديدة', 'coef': 1.0, 'grade': 0.0});
-    });
-  }
-
-  // حذف مادة
-  void _removeAt(int i) {
-    setState(() => subjects.removeAt(i));
-  }
-
-  // حساب المعدّل
-  void _calc() {
-    double total = 0, coefs = 0;
-    for (final s in subjects) {
-      final c = (s['coef'] ?? 1).toDouble();
-      final g = (s['grade'] ?? 0).toDouble();
-      total += g * c;
-      coefs += c;
-    }
-    setState(() {
-      avg = coefs == 0 ? 0 : total / coefs;
-    });
-  }
-
-  // تصدير إلى PDF (شهادة)
-  Future<void> _exportPDF() async {
-    final info = await CertificateIdentity.load();
-
-    final pdf = pw.Document();
-    pdf.addPage(
-      pw.Page(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
-        build: (context) {
-          return pw.Column(
-            crossAxisAlignment: pw.CrossAxisAlignment.center,
-            children: [
-              pw.Text('شهادة حساب المعدل',
-                  style: pw.TextStyle(
-                    fontSize: 18,
-                    fontWeight: pw.FontWeight.bold,
-                  )),
-              pw.SizedBox(height: 8),
-              if ((info['name'] ?? '').isNotEmpty) pw.Text('الطالب: ${info['name']}'),
-              if ((info['uni'] ?? '').isNotEmpty) pw.Text('الجامعة: ${info['uni']}'),
-              pw.SizedBox(height: 16),
-              pw.Table.fromTextArray(
-                headers: ['المادة', 'المعامل', 'العلامة'],
-                headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                cellAlignment: pw.Alignment.center,
-                data: subjects
-                    .map((s) => [
-                          (s['name'] ?? '').toString(),
-                          (s['coef'] ?? 1).toString(),
-                          ((s['grade'] ?? 0) as num).toStringAsFixed(2),
-                        ])
-                    .toList(),
-                border: pw.TableBorder.all(color: PdfColors.grey400),
-              ),
-              pw.SizedBox(height: 16),
-              pw.Text(
-                'المعدل العام: ${avg.toStringAsFixed(2)}',
-                style: pw.TextStyle(
-                  fontSize: 16,
-                  fontWeight: pw.FontWeight.bold,
-                  color: avg >= threshold ? PdfColors.green : PdfColors.red,
-                ),
-              ),
-              pw.SizedBox(height: 6),
-              pw.Text('عتبة النجاح: ${threshold.toStringAsFixed(2)}'),
-              pw.SizedBox(height: 12),
-              pw.Text(
-                avg >= threshold ? '✅ ناجح' : '❌ راسب',
-                style: pw.TextStyle(
-                  fontSize: 18,
-                  fontWeight: pw.FontWeight.bold,
-                  color: avg >= threshold ? PdfColors.green600 : PdfColors.red600,
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    await Printing.sharePdf(
-      bytes: await pdf.save(),
-      filename: 'fachub_result.pdf',
-    );
-  }
-
-  // بطاقة إدخال اسم/جامعة للشهادة
-  Widget _identityCard() {
-    final nameCtrl = TextEditingController();
-    final uniCtrl = TextEditingController();
-
-    return FutureBuilder<Map<String, String>>(
-      future: CertificateIdentity.load(),
-      builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Card(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          );
-        }
-        final data = snap.data ?? {};
-        nameCtrl.text = data['name'] ?? '';
-        uniCtrl.text  = data['uni'] ?? '';
-
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('معلومات الشهادة',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(labelText: 'اسم الطالب'),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: uniCtrl,
-                  decoration: const InputDecoration(labelText: 'الجامعة / الكلية'),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    FilledButton.icon(
-                      onPressed: () async {
-                        await CertificateIdentity.save(
-                          nameCtrl.text.trim(),
-                          uniCtrl.text.trim(),
-                        );
-                        if (!context.mounted) return;
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('تم حفظ بيانات الشهادة ✅')),
-                        );
-                      },
-                      icon: const Icon(Icons.save_outlined),
-                      label: const Text('حفظ'),
-                    ),
-                    const SizedBox(width: 12),
-                    OutlinedButton.icon(
-                      onPressed: _exportPDF,
-                      icon: const Icon(Icons.picture_as_pdf_outlined),
-                      label: const Text('توليد الشهادة (PDF)'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: 'حاسبة المعدل + شهادة PDF',
-      actions: [
-        IconButton(
-          tooltip: 'تصدير PDF',
-          onPressed: _exportPDF,
-          icon: const Icon(Icons.picture_as_pdf_outlined),
-        ),
-      ],
-      body: ListView(
-        padding: const EdgeInsets.all(12),
-        children: [
-          _identityCard(),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                children: [
-                  const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('قائمة المواد', style: TextStyle(fontWeight: FontWeight.w800)),
-                  ),
-                  const SizedBox(height: 8),
-                  ...subjects.asMap().entries.map((e) {
-                    final i = e.key;
-                    final s = e.value;
-                    return Card(
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 3,
-                              child: TextFormField(
-                                initialValue: s['name'],
-                                onChanged: (v) => s['name'] = v,
-                                decoration: const InputDecoration(labelText: 'المادة'),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextFormField(
-                                initialValue: (s['coef'] ?? 1).toString(),
-                                onChanged: (v) => s['coef'] = double.tryParse(v) ?? 1.0,
-                                decoration: const InputDecoration(labelText: 'المعامل'),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextFormField(
-                                initialValue: (s['grade'] ?? 0).toString(),
-                                onChanged: (v) => s['grade'] = double.tryParse(v) ?? 0.0,
-                                decoration: const InputDecoration(labelText: 'العلامة'),
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () => _removeAt(i),
-                              icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      FilledButton.icon(
-                        onPressed: _add,
-                        icon: const Icon(Icons.add),
-                        label: const Text('إضافة مادة'),
-                      ),
-                      const SizedBox(width: 10),
-                      FilledButton.icon(
-                        onPressed: _calc,
-                        icon: const Icon(Icons.calculate),
-                        label: const Text('احسب المعدل'),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextFormField(
-                          initialValue: threshold.toString(),
-                          onChanged: (v) => threshold = double.tryParse(v) ?? 10,
-                          decoration: const InputDecoration(labelText: 'عتبة النجاح'),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'معدلك: ${avg.toStringAsFixed(2)} — ${avg >= threshold ? "✅ ناجح" : "❌ راسب"}',
-                      style: TextStyle(
-                        color: avg >= threshold ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+        destinations: const [
+          NavigationDestination(
+              icon: Icon(Icons.calculate_outlined), label: 'الحاسبة'),
+          NavigationDestination(icon: Icon(Icons.public_outlined), label: 'المجتمع'),
+          NavigationDestination(
+              icon: Icon(Icons.chat_bubble_outline), label: 'الشات'),
+          NavigationDestination(
+              icon: Icon(Icons.settings_outlined), label: 'الإعدادات'),
+          NavigationDestination(
+              icon: Icon(Icons.person_outline), label: 'الحساب'),
         ],
       ),
     );
@@ -1386,501 +1176,32 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 }
 
 // ============================================================================
-// الدراسة (كليات → تخصّصات → مسارات → جدول مطابق للصورة)
+// Utilities & Helpers
 // ============================================================================
 
-// نماذج تفصيلية لبرنامج دراسي
-class ProgramComponent {
-  final String label;   // TD / TP / EXAM / CC ...
-  final double weight;  // نسبة مئوية (من 100)
-  ProgramComponent(this.label, this.weight);
-}
-
-class ProgramModule {
-  final String name;
-  final int coef;       // المعامل
-  final int credits;    // الأرصدة
-  final List<ProgramComponent> components;
-  ProgramModule({
-    required this.name,
-    required this.coef,
-    required this.credits,
-    required this.components,
-  });
-}
-
-class ProgramSemester {
-  final String label; // S1 / S2
-  final List<ProgramModule> modules;
-  ProgramSemester({required this.label, required this.modules});
-}
-
-class ProgramTrack {
-  final String name; // مثال: علوم التسيير
-  final List<ProgramSemester> semesters; // S1, S2
-  ProgramTrack({required this.name, required this.semesters});
-}
-
-class ProgramMajor {
-  final String name; // مثال: علوم الاقتصاد
-  final List<ProgramTrack> tracks;
-  ProgramMajor({required this.name, required this.tracks});
-}
-
-class ProgramFaculty {
-  final String name; // مثال: كلية العلوم الاقتصادية
-  final List<ProgramMajor> majors;
-  ProgramFaculty({required this.name, required this.majors});
-}
-
-// مثال بيانات (يمكن توسعته لاحقًا)
-final demoFaculties = <ProgramFaculty>[
-  ProgramFaculty(
-    name: 'كلية العلوم الاقتصادية',
-    majors: [
-      ProgramMajor(
-        name: 'علوم الاقتصاد',
-        tracks: [
-          ProgramTrack(
-            name: 'علوم التسيير',
-            semesters: [
-              ProgramSemester(
-                label: 'S1',
-                modules: [
-                  ProgramModule(
-                    name: 'Analyse 1',
-                    coef: 4, credits: 6,
-                    components: [ProgramComponent('TD', 30), ProgramComponent('EXAM', 70)],
-                  ),
-                  ProgramModule(
-                    name: 'Algèbre 1',
-                    coef: 3, credits: 5,
-                    components: [ProgramComponent('TD', 30), ProgramComponent('EXAM', 70)],
-                  ),
-                  ProgramModule(
-                    name: 'Algorithmique et structure de données 1',
-                    coef: 2, credits: 4,
-                    components: [
-                      ProgramComponent('TP', 20),
-                      ProgramComponent('TD', 20),
-                      ProgramComponent('EXAM', 60),
-                    ],
-                  ),
-                  ProgramModule(
-                    name: 'Structure machine 1',
-                    coef: 2, credits: 4,
-                    components: [ProgramComponent('TD', 40), ProgramComponent('EXAM', 60)],
-                  ),
-                  ProgramModule(
-                    name: 'Terminologie scientifique et expression écrite',
-                    coef: 2, credits: 3,
-                    components: [ProgramComponent('EXAM', 100)],
-                  ),
-                  ProgramModule(
-                    name: 'Langue Étrangère 1',
-                    coef: 1, credits: 2,
-                    components: [ProgramComponent('EXAM', 100)],
-                  ),
-                  ProgramModule(
-                    name: 'Physique 1',
-                    coef: 2, credits: 4,
-                    components: [ProgramComponent('TD', 40), ProgramComponent('EXAM', 60)],
-                  ),
-                ],
-              ),
-              ProgramSemester(
-                label: 'S2',
-                modules: [
-                  ProgramModule(
-                    name: 'Analyse 2',
-                    coef: 4, credits: 6,
-                    components: [ProgramComponent('TD', 30), ProgramComponent('EXAM', 70)],
-                  ),
-                  ProgramModule(
-                    name: 'Algèbre 2',
-                    coef: 2, credits: 4,
-                    components: [ProgramComponent('TD', 30), ProgramComponent('EXAM', 70)],
-                  ),
-                  ProgramModule(
-                    name: 'Algorithmique et structure de données 2',
-                    coef: 2, credits: 4,
-                    components: [
-                      ProgramComponent('TP', 20),
-                      ProgramComponent('TD', 20),
-                      ProgramComponent('EXAM', 60),
-                    ],
-                  ),
-                  ProgramModule(
-                    name: 'Structure machine 2',
-                    coef: 2, credits: 4,
-                    components: [ProgramComponent('TD', 40), ProgramComponent('EXAM', 60)],
-                  ),
-                  ProgramModule(
-                    name: 'Probabilités & Statistique descriptive',
-                    coef: 3, credits: 5,
-                    components: [ProgramComponent('TD', 40), ProgramComponent('EXAM', 60)],
-                  ),
-                  ProgramModule(
-                    name: 'TIC',
-                    coef: 1, credits: 2,
-                    components: [ProgramComponent('EXAM', 100)],
-                  ),
-                  ProgramModule(
-                    name: 'Outil de programmation pour les mathématiques',
-                    coef: 2, credits: 4,
-                    components: [ProgramComponent('TP', 40), ProgramComponent('EXAM', 60)],
-                  ),
-                  ProgramModule(
-                    name: 'Langue Étrangère 2',
-                    coef: 1, credits: 2,
-                    components: [ProgramComponent('EXAM', 100)],
-                  ),
-                  ProgramModule(
-                    name: 'Physique 2',
-                    coef: 2, credits: 4,
-                    components: [ProgramComponent('TD', 40), ProgramComponent('EXAM', 60)],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
-      ),
-    ],
-  ),
-];
-
-// ------------------------------ الكليات ------------------------------
-class FacultiesScreen extends StatelessWidget {
-  final List<ProgramFaculty> faculties;
-  const FacultiesScreen({super.key, required this.faculties});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('الدراسة • الكليات'),
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_open),
-            onPressed: () => Scaffold.of(ctx).openEndDrawer(),
-          ),
-        ),
-      ),
-      endDrawer: const AppEndDrawer(),
-      body: ListView.separated(
-        itemCount: faculties.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (_, i) {
-          final f = faculties[i];
-          return ListTile(
-            leading: const Icon(Icons.apartment_outlined),
-            title: Text(f.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(
-                builder: (_) => FacultyMajorsScreen(faculty: f),
-              ));
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ---------------------------- تخصّصات الكلية ----------------------------
-class FacultyMajorsScreen extends StatelessWidget {
-  final ProgramFaculty faculty;
-  const FacultyMajorsScreen({super.key, required this.faculty});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('الدراسة • ${faculty.name}')),
-      endDrawer: const AppEndDrawer(),
-      body: ListView.separated(
-        itemCount: faculty.majors.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (_, i) {
-          final m = faculty.majors[i];
-          return ListTile(
-            leading: const Icon(Icons.school_outlined),
-            title: Text(m.name),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(
-                builder: (_) => MajorTracksScreen(major: m),
-              ));
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-// -------------------------- المسارات داخل التخصّص --------------------------
-class MajorTracksScreen extends StatelessWidget {
-  final ProgramMajor major;
-  const MajorTracksScreen({super.key, required this.major});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('الدراسة • ${major.name}')),
-      endDrawer: const AppEndDrawer(),
-      body: ListView.separated(
-        itemCount: major.tracks.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemBuilder: (_, i) {
-          final t = major.tracks[i];
-          return ListTile(
-            leading: const Icon(Icons.view_stream_outlined),
-            title: Text(t.name),
-            subtitle: const Text('S1 + S2'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(context, MaterialPageRoute(
-                builder: (_) => SemesterTableCalculatorScreen(track: t),
-              ));
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-// ------------------------- جدول حساب المعدّل (S1/S2) -------------------------
-class SemesterTableCalculatorScreen extends StatefulWidget {
-  final ProgramTrack track;
-  const SemesterTableCalculatorScreen({super.key, required this.track});
-
-  @override
-  State<SemesterTableCalculatorScreen> createState() => _SemesterTableCalculatorScreenState();
-}
-
-class _SemesterTableCalculatorScreenState extends State<SemesterTableCalculatorScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tab;
-  // نخزّن قيم الإدخال لكل (فصل/مادة/مكوّن) بالمفتاح: sem|moduleIndex|label
-  final Map<String, TextEditingController> _inputs = {};
-
-  @override
-  void initState() {
-    super.initState();
-    _tab = TabController(length: widget.track.semesters.length, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    for (final c in _inputs.values) { c.dispose(); }
-    _tab.dispose();
-    super.dispose();
-  }
-
-  TextEditingController _ctrl(String key) =>
-      _inputs.putIfAbsent(key, () => TextEditingController());
-
-  double _moduleAverage(ProgramModule m, String semKey, int mi) {
-    double sum = 0, w = 0;
-    for (final c in m.components) {
-      final key = '$semKey|$mi|${c.label}';
-      final v = double.tryParse(_ctrl(key).text) ?? 0;
-      sum += v * c.weight;
-      w += c.weight;
-    }
-    return w > 0 ? sum / w : 0;
-  }
-
-  double _semesterAverage(ProgramSemester sem, String semKey) {
-    double total = 0, coefs = 0;
-    for (int i = 0; i < sem.modules.length; i++) {
-      final m = sem.modules[i];
-      final avg = _moduleAverage(m, semKey, i);
-      total += avg * m.coef;
-      coefs += m.coef.toDouble();
-    }
-    return coefs > 0 ? total / coefs : 0;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final semesters = widget.track.semesters;
-    final s1 = semesters.firstWhere((s) => s.label.toUpperCase() == 'S1');
-    final s2 = semesters.firstWhere((s) => s.label.toUpperCase() == 'S2');
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('L1MI • ${widget.track.name}'),
-        bottom: TabBar(
-          controller: _tab,
-          tabs: semesters.map((s) => Tab(text: s.label.toUpperCase())).toList(),
-        ),
-      ),
-      endDrawer: const AppEndDrawer(),
-      body: TabBarView(
-        controller: _tab,
-        children: semesters.map((sem) {
-          final semKey = sem.label.toUpperCase();
-          final s1Avg = _semesterAverage(s1, 'S1');
-          final s2Avg = _semesterAverage(s2, 'S2');
-          final yearAvg = (s1Avg + s2Avg) / 2;
-
-          return ListView(
-            padding: const EdgeInsets.all(12),
-            children: [
-              _semesterTable(sem, semKey),
-              const SizedBox(height: 12),
-              _yearSummaryCard(s1Avg: s1Avg, s2Avg: s2Avg, yearAvg: yearAvg),
-              const SizedBox(height: 18),
-            ],
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _semesterTable(ProgramSemester sem, String semKey) {
-    // مطابق للصورة: أعمدة Modules | Coef | Cred | Note | Moyenne module | Cred Mod
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: DataTable(
-          headingRowColor: WidgetStateProperty.all(Colors.grey.shade200),
-          columns: const [
-            DataColumn(label: Text('Modules')),
-            DataColumn(label: Text('Coef')),
-            DataColumn(label: Text('Cred')),
-            DataColumn(label: Text('Note')),
-            DataColumn(label: Text('Moyenne\nmodule')),
-            DataColumn(label: Text('Cred Mod')),
-          ],
-          rows: [
-            for (int i = 0; i < sem.modules.length; i++) ...[
-              // صف الموديل الرئيسي
-              DataRow(cells: [
-                DataCell(Text(sem.modules[i].name)),
-                DataCell(Text(sem.modules[i].coef.toString())),
-                DataCell(Text(sem.modules[i].credits.toString())),
-                const DataCell(Text('')),
-                DataCell(Text(_moduleAverage(sem.modules[i], semKey, i).toStringAsFixed(2))),
-                DataCell(Text(sem.modules[i].credits.toStringAsFixed(0))),
-              ]),
-              // صفوف المكوّنات (TD/TP/EXAM/...)
-              for (final comp in sem.modules[i].components)
-                DataRow(cells: [
-                  const DataCell(Text('')),
-                  const DataCell(Text('')),
-                  const DataCell(Text('')),
-                  DataCell(
-                    Row(
-                      children: [
-                        SizedBox(
-                          width: 40,
-                          child: Text(comp.label, style: const TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                        const SizedBox(width: 8),
-                        SizedBox(
-                          width: 70,
-                          child: TextField(
-                            controller: _ctrl('$semKey|$i|${comp.label}'),
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(isDense: true, hintText: '0'),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text('${comp.weight.toStringAsFixed(0)}%'),
-                      ],
-                    ),
-                  ),
-                  const DataCell(Text('')),
-                  const DataCell(Text('')),
-                ]),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _yearSummaryCard({
-    required double s1Avg,
-    required double s2Avg,
-    required double yearAvg,
-  }) {
-    return Card(
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          children: [
-            _summaryRow('SEMESTRE/ANNÉE', 'Moyenne', 'Crédits'),
-            const Divider(),
-            _summaryRow('semestre1', s1Avg.toStringAsFixed(2), '0.00'),
-            _summaryRow('semestre2', s2Avg.toStringAsFixed(2), '0.00'),
-            const Divider(),
-            _summaryRow('Année', yearAvg.toStringAsFixed(2), '0.00'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _summaryRow(String a, String b, String c) {
-    return Row(
-      children: [
-        Expanded(child: Text(a, style: const TextStyle(fontWeight: FontWeight.bold))),
-        SizedBox(width: 100, child: Text(b, textAlign: TextAlign.center)),
-        SizedBox(width: 100, child: Text(c, textAlign: TextAlign.center)),
-      ],
-    );
-  }
-}
-// ============================================================================
-// ويدجت EmptyHint لعرض رسالة فارغة
-// ============================================================================
 class EmptyHint extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
-
-  const EmptyHint({
-    super.key,
-    required this.icon,
-    required this.title,
-    this.subtitle,
-  });
+  const EmptyHint(
+      {super.key, required this.icon, required this.title, this.subtitle});
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 64, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
+            Icon(icon, size: 56, color: Colors.grey.shade500),
+            const SizedBox(height: 10),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
             if (subtitle != null) ...[
               const SizedBox(height: 6),
-              Text(
-                subtitle!,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
-              ),
+              Text(subtitle!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.black54)),
             ],
           ],
         ),
@@ -1888,3 +1209,606 @@ class EmptyHint extends StatelessWidget {
     );
   }
 }
+
+extension SafeStringExt on String {
+  String ellipsize(int max, {String ellipsis = '…'}) {
+    if (length <= max) return this;
+    if (max <= 0) return '';
+    return substring(0, max) + ellipsis;
+  }
+}
+
+// ============================================================================
+// الدراسة (الكليات → التخصصات → الفروع → جدول المعدل)
+// ============================================================================
+final demoFaculties = [
+  Faculty(
+    name: 'كلية العلوم الاقتصادية والتجارية وعلوم التسيير',
+    majors: [
+      Major(
+        name: 'علوم التسيير',
+        tracks: [
+          'تسيير الموارد البشرية',
+          'تسويق',
+          'مالية ومحاسبة',
+          'إدارة الأعمال',
+        ],
+      ),
+      Major(
+        name: 'العلوم الاقتصادية',
+        tracks: [
+          'اقتصاد دولي',
+          'اقتصاد نقدي ومالي',
+          'اقتصاد وتسيير المؤسسات',
+        ],
+      ),
+    ],
+  ),
+  Faculty(
+    name: 'كلية التكنولوجيا',
+    majors: [
+      Major(
+        name: 'هندسة مدنية',
+        tracks: ['منشآت', 'طرق وجسور', 'هندسة معمارية'],
+      ),
+      Major(
+        name: 'هندسة كهربائية',
+        tracks: ['الكترونيك', 'كهرباء صناعية', 'طاقة'],
+      ),
+    ],
+  ),
+];
+
+class Faculty {
+  final String name;
+  final List<Major> majors;
+  Faculty({required this.name, required this.majors});
+}
+
+class Major {
+  final String name;
+  final List<String> tracks;
+  Major({required this.name, required this.tracks});
+}
+
+class FacultiesScreen extends StatelessWidget {
+  final List<Faculty> faculties;
+  const FacultiesScreen({super.key, required this.faculties});
+
+  @override
+  Widget build(BuildContext context) {
+    return BaseScaffold(
+      title: 'الكليات',
+      body: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: faculties.length,
+        itemBuilder: (_, i) {
+          final f = faculties[i];
+          return Card(
+            child: ListTile(
+              leading: const Icon(Icons.account_balance),
+              title: Text(f.name),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FacultyMajorsScreen(faculty: f),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class FacultyMajorsScreen extends StatelessWidget {
+  final Faculty faculty;
+  const FacultyMajorsScreen({super.key, required this.faculty});
+
+  @override
+  Widget build(BuildContext context) {
+    return BaseScaffold(
+      title: faculty.name,
+      body: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: faculty.majors.length,
+        itemBuilder: (_, i) {
+          final m = faculty.majors[i];
+          return Card(
+            child: ListTile(
+              leading: const Icon(Icons.school_outlined),
+              title: Text(m.name),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => MajorTracksScreen(major: m),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class MajorTracksScreen extends StatelessWidget {
+  final Major major;
+  const MajorTracksScreen({super.key, required this.major});
+
+  @override
+  Widget build(BuildContext context) {
+    return BaseScaffold(
+      title: major.name,
+      body: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: major.tracks.length,
+        itemBuilder: (_, i) {
+          final t = major.tracks[i];
+          return Card(
+            child: ListTile(
+              leading: const Icon(Icons.menu_book_outlined),
+              title: Text(t),
+              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => SemesterTableCalculatorScreen(title: t),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// جدول المعدّل (مطابق للصورة + ملخص)
+// ============================================================================
+
+class SemesterTableCalculatorScreen extends StatefulWidget {
+  final String title;
+  const SemesterTableCalculatorScreen({super.key, required this.title});
+
+  @override
+  State<SemesterTableCalculatorScreen> createState() =>
+      _SemesterTableCalculatorScreenState();
+}
+
+class _SemesterTableCalculatorScreenState
+    extends State<SemesterTableCalculatorScreen> with TickerProviderStateMixin {
+  late final TabController _tab;
+
+  final List<ModuleRow> s1 = [
+    ModuleRow(name: 'Analyse 1', coef: 4, cred: 6, parts: [
+      PartRow(label: 'TD', weight: 0.3),
+      PartRow(label: 'EXAM', weight: 0.7),
+    ]),
+    ModuleRow(name: 'Algèbre 1', coef: 3, cred: 5, parts: [
+      PartRow(label: 'TD', weight: 0.3),
+      PartRow(label: 'EXAM', weight: 0.7),
+    ]),
+    ModuleRow(name: 'Algorithmique et structure de données 1', coef: 3, cred: 5,
+        parts: [
+          PartRow(label: 'TP', weight: 0.0),
+          PartRow(label: 'TD', weight: 0.3),
+          PartRow(label: 'EXAM', weight: 0.7),
+        ]),
+    ModuleRow(name: 'Structure machine 1', coef: 3, cred: 5, parts: [
+      PartRow(label: 'TD', weight: 0.3),
+      PartRow(label: 'EXAM', weight: 0.7),
+    ]),
+    ModuleRow(name: 'Terminologie scientifique et expression écrite', coef: 1, cred: 2, parts: [
+      PartRow(label: 'EXAM', weight: 1.0),
+    ]),
+    ModuleRow(name: 'Langue Étrangère 1', coef: 1, cred: 2, parts: [
+      PartRow(label: 'EXAM', weight: 1.0),
+    ]),
+    ModuleRow(name: 'Physique 1', coef: 2, cred: 4, parts: [
+      PartRow(label: 'TD', weight: 0.3),
+      PartRow(label: 'EXAM', weight: 0.7),
+    ]),
+  ];
+
+  final List<ModuleRow> s2 = [
+    ModuleRow(name: 'Analyse 2', coef: 4, cred: 6, parts: [
+      PartRow(label: 'TD', weight: 0.3),
+      PartRow(label: 'EXAM', weight: 0.7),
+    ]),
+    ModuleRow(name: 'Algèbre 2', coef: 2, cred: 4, parts: [
+      PartRow(label: 'TD', weight: 0.3),
+      PartRow(label: 'EXAM', weight: 0.7),
+    ]),
+    ModuleRow(name: 'Algorithmique et structure de données 2', coef: 3, cred: 5,
+        parts: [
+          PartRow(label: 'TP', weight: 0.0),
+          PartRow(label: 'TD', weight: 0.3),
+          PartRow(label: 'EXAM', weight: 0.7),
+        ]),
+    ModuleRow(name: 'Structure machine 2', coef: 2, cred: 4, parts: [
+      PartRow(label: 'TD', weight: 0.3),
+      PartRow(label: 'EXAM', weight: 0.7),
+    ]),
+    ModuleRow(name: 'Introduction aux probabilités…', coef: 3, cred: 5, parts: [
+      PartRow(label: 'TD', weight: 0.3),
+      PartRow(label: 'EXAM', weight: 0.7),
+    ]),
+    ModuleRow(name: 'Technologie de l’information et de la communication',
+        coef: 1, cred: 2, parts: [
+          PartRow(label: 'EXAM', weight: 1.0),
+        ]),
+    ModuleRow(
+        name: 'Outils de programmation pour les mathématiques',
+        coef: 1,
+        cred: 2,
+        parts: [
+          PartRow(label: 'TP', weight: 0.0),
+          PartRow(label: 'EXAM', weight: 1.0),
+        ]),
+    ModuleRow(name: 'Physique 2', coef: 2, cred: 4, parts: [
+      PartRow(label: 'TD', weight: 0.3),
+      PartRow(label: 'EXAM', weight: 0.7),
+    ]),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tab.dispose();
+    super.dispose();
+  }
+
+  double _weightedAvg(List<ModuleRow> mods) {
+    double w = 0, c = 0;
+    for (final m in mods) {
+      final a = m.average;
+      if (a != null) {
+        w += a * m.coef;
+        c += m.coef;
+      }
+    }
+    return c == 0 ? 0 : w / c;
+    }
+
+  int _earnedCredits(List<ModuleRow> mods) {
+    int sum = 0;
+    for (final m in mods) {
+      final a = m.average;
+      if (a != null && a >= 10) sum += m.cred;
+    }
+    return sum;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s1Avg = _weightedAvg(s1);
+    final s2Avg = _weightedAvg(s2);
+    final yAvg = (s1Avg + s2Avg) / 2.0;
+
+    final s1Cred = _earnedCredits(s1);
+    final s2Cred = _earnedCredits(s2);
+    final yCred = s1Cred + s2Cred;
+
+    return BaseScaffold(
+      title: '${widget.title} • L1MI',
+      body: Column(
+        children: [
+          const SizedBox(height: 6),
+          TabBar(
+            controller: _tab,
+            tabs: const [Tab(text: 'SEMESTER 2'), Tab(text: 'SEMESTER 1')],
+          ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: TabBarView(
+              controller: _tab,
+              children: [
+                _SemesterSheet(
+                  title: 'SEMESTER 2',
+                  modules: s2,
+                  onChanged: () => setState(() {}),
+                ),
+                _SemesterSheet(
+                  title: 'SEMESTER 1',
+                  modules: s1,
+                  onChanged: () => setState(() {}),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Card(
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  children: [
+                    _summaryHeader(),
+                    const Divider(),
+                    _summaryRow('semestre1', s1Avg.toStringAsFixed(2), '$s1Cred'),
+                    _summaryRow('semestre2', s2Avg.toStringAsFixed(2), '$s2Cred'),
+                    const Divider(),
+                    _summaryRow('Année', yAvg.toStringAsFixed(2), '$yCred'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _summaryHeader() => Row(
+        children: const [
+          Expanded(
+              child: Text('Semestre/année',
+                  style: TextStyle(fontWeight: FontWeight.bold))),
+          SizedBox(
+              width: 100,
+              child: Text('Moyenne', textAlign: TextAlign.center)),
+          SizedBox(width: 100, child: Text('Crédits', textAlign: TextAlign.center)),
+        ],
+      );
+
+  Widget _summaryRow(String a, String b, String c) => Row(
+        children: [
+          Expanded(child: Text(a)),
+          SizedBox(width: 100, child: Text(b, textAlign: TextAlign.center)),
+          SizedBox(width: 100, child: Text(c, textAlign: TextAlign.center)),
+        ],
+      );
+}
+
+class _SemesterSheet extends StatelessWidget {
+  final String title;
+  final List<ModuleRow> modules;
+  final VoidCallback onChanged;
+  const _SemesterSheet({
+    required this.title,
+    required this.modules,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const tableWidth = 740.0; // لثبات الأعمدة ومنع overflow
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SizedBox(
+        width: tableWidth,
+        child: ListView(
+          padding: const EdgeInsets.all(12),
+          children: [
+            Center(
+              child: Text(title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, letterSpacing: .5)),
+            ),
+            const SizedBox(height: 6),
+            _TableHeader(),
+            const SizedBox(height: 8),
+            ...modules.map((m) => _ModuleBlock(module: m, onChanged: onChanged)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TableHeader extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+        child: Row(
+          children: const [
+            Expanded(flex: 4, child: _HeadCell('Modules')),
+            Expanded(flex: 1, child: _HeadCell('Coef')),
+            Expanded(flex: 1, child: _HeadCell('Cred')),
+            Expanded(flex: 1, child: _HeadCell('Note')),
+            Expanded(flex: 2, child: _HeadCell('Moyenne module')),
+            Expanded(flex: 1, child: _HeadCell('Cred Mod')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeadCell extends StatelessWidget {
+  final String title;
+  const _HeadCell(this.title);
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+    );
+  }
+}
+
+class _ModuleBlock extends StatelessWidget {
+  final ModuleRow module;
+  final VoidCallback onChanged;
+  const _ModuleBlock({required this.module, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final avg = module.average ?? 0;
+    final earned = (module.average ?? 0) >= 10 ? module.cred : 0;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(flex: 4, child: Text(module.name)),
+                Expanded(flex: 1, child: Center(child: Text('${module.coef}'))),
+                Expanded(flex: 1, child: Center(child: Text('${module.cred}'))),
+                const Expanded(flex: 1, child: SizedBox()),
+                Expanded(
+                  flex: 2,
+                  child: Center(
+                    child: Text(avg.toStringAsFixed(2),
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                Expanded(
+                  flex: 1,
+                  child: Center(
+                    child: Text('$earned',
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
+            const Divider(),
+            Column(
+              children: module.parts.map((p) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      const Expanded(flex: 4, child: SizedBox()),
+                      const Expanded(flex: 1, child: SizedBox()),
+                      const Expanded(flex: 1, child: SizedBox()),
+                      Expanded(
+                        flex: 1,
+                        child: _NoteField(
+                          label: p.label,
+                          percent: (p.weight * 100).round(),
+                          controller: p.ctrl,
+                          onChanged: onChanged,
+                        ),
+                      ),
+                      const Expanded(flex: 2, child: SizedBox()),
+                      const Expanded(flex: 1, child: SizedBox()),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NoteField extends StatelessWidget {
+  final String label;
+  final int percent;
+  final TextEditingController controller;
+  final VoidCallback onChanged;
+  const _NoteField({
+    required this.label,
+    required this.percent,
+    required this.controller,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(width: 40, child: Text(label)),
+        SizedBox(width: 40, child: Text('$percent%')),
+        const SizedBox(width: 8),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.end,
+            decoration: const InputDecoration(
+              isDense: true,
+              suffixText: '20',
+              border: UnderlineInputBorder(),
+            ),
+            onChanged: (_) => onChanged(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class ModuleRow {
+  final String name;
+  final int coef;
+  final int cred;
+  final List<PartRow> parts;
+
+  ModuleRow({
+    required this.name,
+    required this.coef,
+    required this.cred,
+    required this.parts,
+  });
+
+  double? get average {
+    double w = 0, sum = 0;
+    for (final p in parts) {
+      final v = double.tryParse(p.ctrl.text);
+      if (p.weight > 0 && v == null) return null;
+      sum += (v ?? 0) * p.weight;
+      w += p.weight;
+    }
+    if (w == 0) return null;
+    return sum;
+  }
+}
+
+class PartRow {
+  final String label; // TD/EXAM/TP
+  final double weight; // 0.3 => 30%
+  final TextEditingController ctrl = TextEditingController();
+  PartRow({required this.label, required this.weight});
+}
+
+// ============================================================================
+// Placeholder Calculator Screen (للمدخل من الـDrawer)
+// ============================================================================
+class CalculatorScreen extends StatelessWidget {
+  const CalculatorScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('حاسبة المعدل')),
+      endDrawer: const AppEndDrawer(),
+      body: const Center(
+        child: Text('شاشة الحاسبة غير موجودة حاليًا. هذه نسخة مؤقتة.'),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// ملاحظات pubspec.yaml (ضعها عندك)
+// ============================================================================
+// dependencies:
+//   image_picker: ^1.1.2
+//   firebase_core: ^2.31.1
+//   cloud_firestore: ^4.15.8
+//   firebase_auth: ^4.17.9
+//   firebase_storage: ^11.6.9
