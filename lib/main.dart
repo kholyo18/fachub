@@ -1,12 +1,11 @@
 // ============================================================================
-// Fachub — main.dart (FULL, FIXED & ENHANCED) — PART 1/3
+// Fachub — main.dart  (REDESIGN: Home+Notes+DragNav + Grid-like GPA Table)
 // ============================================================================
 
-import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
-
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 // Firebase
@@ -23,17 +22,19 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
-// Media & utils
-import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-
 import 'firebase_options.dart';
 
 // ============================================================================
 // Branding
 // ============================================================================
 const kFachubGreen = Color(0xFF16434A);
-const kFachubBlue = Color(0xFF2365EB);
+const kFachubBlue  = Color(0xFF2365EB);
+
+// ألوان للواجهة الجديدة
+const _homeBg     = Color(0xFFF6F7FB);
+const _chipBg     = Color(0xFFEAEFFC);
+const _chipText   = Color(0xFF23418E);
+const _noteAccent = Color(0xFFFFC857);
 
 // ============================================================================
 // Bootstrap
@@ -45,12 +46,11 @@ Future<void> main() async {
 }
 
 // ============================================================================
-// App root (Theme + Locale) — ثابت ويعمل: تبديل اللغة/الثيم + حفظ التفضيلات
+// App root (Theme + Locale)
 // ============================================================================
 class FachubApp extends StatefulWidget {
   const FachubApp({super.key});
 
-  // للوصول للإعدادات من أي مكان (Drawer/Settings)
   static _FachubAppState of(BuildContext context) =>
       context.findAncestorStateOfType<_FachubAppState>()!;
 
@@ -123,7 +123,7 @@ class _FachubAppState extends State<FachubApp> {
 }
 
 // ============================================================================
-// Global End Drawer (يظهر بكل الشاشات الرئيسية)
+// Global End Drawer (appears in all main screens)
 // ============================================================================
 class AppEndDrawer extends StatelessWidget {
   const AppEndDrawer({super.key});
@@ -142,10 +142,8 @@ class AppEndDrawer extends StatelessWidget {
               decoration: const BoxDecoration(
                 gradient: LinearGradient(colors: [kFachubBlue, kFachubGreen]),
               ),
-              accountName: Text(
-                user?.email?.split('@').first ?? 'Guest',
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
+              accountName: Text(user?.email?.split('@').first ?? 'Guest',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
               accountEmail: Text(user?.email ?? 'غير مسجّل'),
               currentAccountPicture: const CircleAvatar(
                 backgroundColor: Colors.white,
@@ -153,35 +151,28 @@ class AppEndDrawer extends StatelessWidget {
               ),
             ),
 
-            // ---------------- التنقّل العام ----------------
             ListTile(
               leading: const Icon(Icons.calculate_outlined),
               title: const Text('حاسبة المعدل'),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CalculatorScreen()),
-                );
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const CalculatorScreen()));
               },
             ),
             ListTile(
               leading: const Icon(Icons.public_outlined),
               title: const Text('المجتمع'),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CommunityScreen()),
-                );
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const CommunityScreen()));
               },
             ),
             ListTile(
               leading: const Icon(Icons.chat_bubble_outline),
               title: const Text('الشات'),
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ChatScreen()),
-                );
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const ChatScreen()));
               },
             ),
             ListTile(
@@ -199,7 +190,6 @@ class AppEndDrawer extends StatelessWidget {
 
             const Divider(height: 24),
 
-            // ---------------- المظهر واللغة ----------------
             ListTile(
               leading: const Icon(Icons.color_lens_outlined),
               title: const Text('تغيير المظهر'),
@@ -231,12 +221,10 @@ class AppEndDrawer extends StatelessWidget {
 
             const Divider(height: 24),
 
-            // ---------------- الحساب ----------------
             if (user != null) ...[
               ListTile(
                 leading: const Icon(Icons.lock_reset),
                 title: const Text('إعادة تعيين كلمة المرور'),
-                subtitle: const Text('إرسال رابط لبريدك'),
                 onTap: () async {
                   try {
                     await FirebaseAuth.instance
@@ -249,7 +237,7 @@ class AppEndDrawer extends StatelessWidget {
                   } catch (e) {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('تعذّر الإرسال: $e')),
+                        SnackBar(content: Text('تعذر الإرسال: $e')),
                       );
                     }
                   }
@@ -281,7 +269,6 @@ class AppEndDrawer extends StatelessWidget {
 
             const Divider(height: 24),
 
-            // ---------------- حول ----------------
             ListTile(
               leading: const Icon(Icons.info_outline),
               title: const Text('حول التطبيق'),
@@ -415,7 +402,7 @@ class _LanguageSheet extends StatelessWidget {
 }
 
 // ============================================================================
-// AuthGate + SignIn + BaseScaffold + Settings + Account
+// Auth Gate + Sign-in
 // ============================================================================
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -429,7 +416,8 @@ class AuthGate extends StatelessWidget {
           return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
         if (!snap.hasData) return const SignInScreen();
-        return const HomeTabs();
+        // الدخول إلى القشرة الجديدة
+        return const HomeShell();
       },
     );
   }
@@ -455,8 +443,7 @@ class _SignInScreenState extends State<SignInScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('خطأ: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('خطأ: $e')));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -471,8 +458,7 @@ class _SignInScreenState extends State<SignInScreen> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('فشل التسجيل: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('فشل التسجيل: $e')));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -487,16 +473,14 @@ class _SignInScreenState extends State<SignInScreen> {
           padding: const EdgeInsets.all(24),
           child: Card(
             elevation: 3,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 const Icon(Icons.school_rounded, color: kFachubBlue, size: 64),
                 const SizedBox(height: 12),
                 const Text("مرحبًا بك في Fachub",
-                    style:
-                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 20),
                 TextField(
                   controller: email,
@@ -537,118 +521,94 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 }
 
-class BaseScaffold extends StatelessWidget {
-  final String title;
-  final Widget body;
-  final List<Widget>? actions;
-  final FloatingActionButton? fab;
+// ============================================================================
+// القشرة الجديدة: Home • Notes • Community  (Drag/Press & Slide)
+// ============================================================================
+class HomeShell extends StatefulWidget {
+  const HomeShell({super.key});
+  @override
+  State<HomeShell> createState() => _HomeShellState();
+}
 
-  const BaseScaffold({
-    super.key,
-    required this.title,
-    required this.body,
-    this.actions,
-    this.fab,
-  });
+class _HomeShellState extends State<HomeShell> with SingleTickerProviderStateMixin {
+  late final PageController _page;
+  int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _page = PageController(initialPage: 0);
+  }
+
+  void _go(int i) {
+    setState(() => _index = i);
+    _page.animateToPage(i,
+        duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic);
+  }
+
+  // دعم السحب الأفقي على الشريط نفسه
+  double _dragX = 0;
+  int _dragStartIndex = 0;
 
   @override
   Widget build(BuildContext context) {
+    final nav = _BottomDragBar(
+      selected: _index,
+      onTap: _go,
+      onHorizontalDragStart: (dx) {
+        _dragX = dx;
+        _dragStartIndex = _index;
+      },
+      onHorizontalDragUpdate: (dx) {
+        final delta = dx - _dragX;
+        if (delta.abs() < 24) return;
+        if (delta < 0 && _dragStartIndex < 2) _go(_dragStartIndex + 1);
+        if (delta > 0 && _dragStartIndex > 0) _go(_dragStartIndex - 1);
+        _dragX = dx;
+        _dragStartIndex = _index;
+      },
+    );
+
     return Scaffold(
-      appBar: AppBar(title: Text(title), actions: actions),
+      backgroundColor: _homeBg,
       endDrawer: const AppEndDrawer(),
-      body: body,
-      floatingActionButton: fab,
-    );
-  }
-}
-
-class SettingsScreen extends StatelessWidget {
-  const SettingsScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final app = FachubApp.of(context);
-    return BaseScaffold(
-      title: 'الإعدادات',
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text('المظهر واللغة',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 8),
-          SegmentedButton<ThemeMode>(
-            segments: const [
-              ButtonSegment(value: ThemeMode.light, label: Text('فاتح')),
-              ButtonSegment(value: ThemeMode.dark, label: Text('داكن')),
-              ButtonSegment(value: ThemeMode.system, label: Text('النظام')),
-            ],
-            selected: {app._themeMode},
-            onSelectionChanged: (s) => app.setThemeMode(s.first),
-          ),
-          const SizedBox(height: 16),
-          const Text('اللغة', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-          RadioListTile<String>(
-            value: 'ar',
-            groupValue: app._locale.languageCode,
-            title: const Text('العربية'),
-            onChanged: (_) => app.setLocale(const Locale('ar')),
-          ),
-          RadioListTile<String>(
-            value: 'fr',
-            groupValue: app._locale.languageCode,
-            title: const Text('Français'),
-            onChanged: (_) => app.setLocale(const Locale('fr')),
-          ),
-          RadioListTile<String>(
-            value: 'en',
-            groupValue: app._locale.languageCode,
-            title: const Text('English'),
-            onChanged: (_) => app.setLocale(const Locale('en')),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class AccountScreen extends StatelessWidget {
-  const AccountScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    return BaseScaffold(
-      title: 'الحساب',
-      body: Padding(
-        padding: const EdgeInsets.all(20),
+      body: SafeArea(
         child: Column(
           children: [
-            CircleAvatar(
-              radius: 40,
-              backgroundColor: Colors.blue.shade100,
-              child: const Icon(Icons.person, size: 48, color: kFachubBlue),
-            ),
-            const SizedBox(height: 16),
-            Text(user?.email ?? 'غير مسجّل الدخول',
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 20),
-            if (user != null)
-              FilledButton.icon(
-                onPressed: () async {
-                  await FirebaseAuth.instance.signOut();
-                  if (!context.mounted) return;
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (_) => const SignInScreen()),
-                    (_) => false,
-                  );
-                },
-                icon: const Icon(Icons.logout),
-                label: const Text('تسجيل الخروج'),
+            // App bar بسيط
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.menu),
+                    onPressed: () => Scaffold.of(context).openEndDrawer(),
+                  ),
+                  const Spacer(),
+                  const Text('Fachub', style: TextStyle(
+                    fontWeight: FontWeight.w800, fontSize: 18)),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.search),
+                    onPressed: () {},
+                  ),
+                ],
               ),
-            const Spacer(),
-            const Text('Fachub © 2025', style: TextStyle(color: Colors.grey)),
+            ),
+            // الصفحات
+            Expanded(
+              child: PageView(
+                controller: _page,
+                physics: const BouncingScrollPhysics(),
+                onPageChanged: (i) => setState(() => _index = i),
+                children: const [
+                  _HomeFacultiesPage(),
+                  NotesScreen(),
+                  CommunityScreen(),
+                ],
+              ),
+            ),
+            nav,
           ],
         ),
       ),
@@ -656,16 +616,1075 @@ class AccountScreen extends StatelessWidget {
   }
 }
 
+// شريط تنقّل سفلي يمكن الضغط والسحب عليه للتبديل
+class _BottomDragBar extends StatelessWidget {
+  final int selected;
+  final void Function(int) onTap;
+  final void Function(double dx)? onHorizontalDragStart;
+  final void Function(double dx)? onHorizontalDragUpdate;
+
+  const _BottomDragBar({
+    required this.selected,
+    required this.onTap,
+    this.onHorizontalDragStart,
+    this.onHorizontalDragUpdate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      (Icons.home_outlined, 'الرئيسية'),
+      (Icons.note_alt_outlined, 'ملاحظات'),
+      (Icons.public_outlined, 'المجتمع'),
+    ];
+
+    return GestureDetector(
+      onHorizontalDragStart: (d) => onHorizontalDragStart?.call(d.localPosition.dx),
+      onHorizontalDragUpdate: (d) => onHorizontalDragUpdate?.call(d.localPosition.dx),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 18,
+              offset: const Offset(0, -4),
+            )
+          ],
+        ),
+        child: Row(
+          children: List.generate(items.length, (i) {
+            final (icon, label) = items[i];
+            final sel = i == selected;
+            return Expanded(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => onTap(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(
+                    color: sel ? _chipBg : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, size: 24, color: sel ? _chipText : null),
+                      const SizedBox(height: 4),
+                      Text(label, style: TextStyle(
+                        fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+                        color: sel ? _chipText : null,
+                      )),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
 // ============================================================================
-// شاشات المجتمع + الشات + التنقل السفلي + عناصر مشتركة
+// صفحة الرئيسية: قائمة الكليات (قابلة للتمرير) بشكل احترافي
+// ============================================================================
+class _HomeFacultiesPage extends StatelessWidget {
+  const _HomeFacultiesPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      children: [
+        const SizedBox(height: 6),
+        const Text('اختر الكلية', style: TextStyle(
+          fontWeight: FontWeight.w800, fontSize: 18)),
+        const SizedBox(height: 10),
+        ...demoFaculties.map((f) => _FacultyCard(f: f)),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+}
+
+class _FacultyCard extends StatelessWidget {
+  final Faculty f;
+  const _FacultyCard({required this.f});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => FacultyMajorsScreen(faculty: f),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 46, height: 46,
+                decoration: BoxDecoration(
+                  color: _chipBg, borderRadius: BorderRadius.circular(12)),
+                child: const Icon(Icons.account_balance, color: _chipText),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(f.name, style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 15)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6, runSpacing: -6,
+                      children: f.majors.take(3).map((m) =>
+                        Chip(
+                          label: Text(m.name, style: const TextStyle(fontSize: 12)),
+                          backgroundColor: _chipBg, side: BorderSide.none,
+                          visualDensity: VisualDensity.compact,
+                        )
+                      ).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// شاشة الملاحظات (احترافية، محلية — لاحقًا يمكن ربطها بـ Firestore)
+// ============================================================================
+class NotesScreen extends StatefulWidget {
+  const NotesScreen({super.key});
+  @override
+  State<NotesScreen> createState() => _NotesScreenState();
+}
+
+class _NotesScreenState extends State<NotesScreen> {
+  final _notes = <_Note>[];
+  final _ctrl = TextEditingController();
+
+  void _addNoteDialog() {
+    _ctrl.clear();
+    showModalBottomSheet(
+      context: context, isScrollControlled: true,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom + 12,
+          left: 12, right: 12, top: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('ملاحظة جديدة',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _ctrl, maxLines: 4,
+              decoration: const InputDecoration(
+                hintText: 'اكتب ملاحظتك هنا...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Spacer(),
+                FilledButton.icon(
+                  onPressed: () {
+                    if (_ctrl.text.trim().isEmpty) return;
+                    setState(() {
+                      _notes.insert(0, _Note(_ctrl.text.trim(), DateTime.now()));
+                    });
+                    Navigator.pop(ctx);
+                  },
+                  icon: const Icon(Icons.save_outlined),
+                  label: const Text('حفظ'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _homeBg,
+      endDrawer: const AppEndDrawer(),
+      appBar: AppBar(
+        title: const Text('ملاحظات'),
+        actions: [
+          IconButton(onPressed: _addNoteDialog, icon: const Icon(Icons.add)),
+        ],
+      ),
+      body: _notes.isEmpty
+          ? const EmptyHint(
+              icon: Icons.note_alt_outlined,
+              title: 'لا توجد ملاحظات بعد',
+              subtitle: 'دوّن أفكارك وخلاصة الدروس هنا ✨',
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: _notes.length,
+              itemBuilder: (_, i) {
+                final n = _notes[i];
+                return Dismissible(
+                  key: ValueKey(n.created),
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade400,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.delete, color: Colors.white),
+                  ),
+                  onDismissed: (_) => setState(() => _notes.removeAt(i)),
+                  child: Card(
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                    child: ListTile(
+                      leading: Container(
+                        width: 38, height: 38,
+                        decoration: BoxDecoration(
+                          color: _noteAccent, borderRadius: BorderRadius.circular(10)),
+                        child: const Icon(Icons.push_pin, color: Colors.black87),
+                      ),
+                      title: Text(n.text),
+                      subtitle: Text(
+                        '${n.created.year}/${n.created.month.toString().padLeft(2,'0')}/${n.created.day.toString().padLeft(2,'0')} '
+                        '${n.created.hour.toString().padLeft(2,'0')}:${n.created.minute.toString().padLeft(2,'0')}'),
+                    ),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}
+
+class _Note {
+  final String text;
+  final DateTime created;
+  _Note(this.text, this.created);
+}
+// ============================================================================
+// Community (Firestore)
+// ============================================================================
+class CommunityScreen extends StatefulWidget {
+  const CommunityScreen({super.key});
+  @override
+  State<CommunityScreen> createState() => _CommunityScreenState();
+}
+
+class _CommunityScreenState extends State<CommunityScreen> {
+  final _text = TextEditingController();
+  final _tagCtrl = TextEditingController();
+  bool _posting = false;
+
+  Future<void> _post() async {
+    if (_text.text.trim().isEmpty) return;
+    setState(() => _posting = true);
+    try {
+      await FirebaseFirestore.instance.collection('posts').add({
+        'text': _text.text.trim(),
+        'tags': _parseTags(_tagCtrl.text),
+        'likes': 0,
+        'uid': FirebaseAuth.instance.currentUser?.uid,
+        'ts': FieldValue.serverTimestamp(),
+      });
+      _text.clear();
+      _tagCtrl.clear();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('تعذر النشر: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _posting = false);
+    }
+  }
+
+  List<String> _parseTags(String s) {
+    return s
+        .split(RegExp(r'[,\s]+'))
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .take(8)
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = FirebaseFirestore.instance
+        .collection('posts')
+        .orderBy('ts', descending: true);
+
+    return Scaffold(
+      backgroundColor: _homeBg,
+      endDrawer: const AppEndDrawer(),
+      appBar: AppBar(title: const Text('المجتمع')),
+      body: Column(
+        children: [
+          // Composer
+          Card(
+            margin: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _text,
+                    minLines: 2,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText: 'شارك سؤالاً أو تجربة أو معلومة...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _tagCtrl,
+                          decoration: const InputDecoration(
+                            hintText: 'وسوم مفصولة بمسافة أو فاصلة...',
+                            prefixIcon: Icon(Icons.sell_outlined),
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: _posting ? null : _post,
+                        icon: const Icon(Icons.send_rounded),
+                        label: _posting
+                            ? const Text('جاري...')
+                            : const Text('نشر'),
+                      )
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: q.snapshots(),
+              builder: (ctx, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final docs = snap.data?.docs ?? [];
+                if (docs.isEmpty) {
+                  return EmptyHint(
+                    icon: Icons.hourglass_empty_outlined,
+                    title: 'لا توجد منشورات بعد',
+                    subtitle: 'كن أول من يشارك منشورًا!',
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                  itemCount: docs.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 8),
+                  itemBuilder: (_, i) {
+                    final d = docs[i].data();
+                    final id = docs[i].id;
+                    final text = d['text'] as String? ?? '';
+                    final likes = (d['likes'] ?? 0) as int;
+                    final tags = (d['tags'] as List?)?.cast<String>() ?? [];
+
+                    return Card(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const CircleAvatar(
+                                  child: Icon(Icons.person),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  d['uid'] != null ? 'طالب' : 'مجهول',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700),
+                                ),
+                                const Spacer(),
+                                IconButton(
+                                  onPressed: () async {
+                                    await FirebaseFirestore.instance
+                                        .collection('posts')
+                                        .doc(id)
+                                        .delete();
+                                  },
+                                  icon: const Icon(Icons.more_horiz),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(text),
+                            const SizedBox(height: 8),
+                            if (tags.isNotEmpty)
+                              Wrap(
+                                spacing: 6,
+                                children: tags
+                                    .map((t) => Chip(
+                                          label:
+                                              Text('#$t', style: const TextStyle(fontSize: 12)),
+                                          backgroundColor: _chipBg,
+                                          side: BorderSide.none,
+                                        ))
+                                    .toList(),
+                              ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                IconButton(
+                                  onPressed: () async {
+                                    await FirebaseFirestore.instance
+                                        .collection('posts')
+                                        .doc(id)
+                                        .update({'likes': likes + 1});
+                                  },
+                                  icon: const Icon(Icons.favorite_border),
+                                ),
+                                Text('$likes إعجاب'),
+                                const Spacer(),
+                                IconButton(
+                                  onPressed: () {},
+                                  icon: const Icon(Icons.share_outlined),
+                                ),
+                              ],
+                            )
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// Chat (Firestore)
+// ============================================================================
+class ChatScreen extends StatefulWidget {
+  const ChatScreen({super.key});
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  final _msg = TextEditingController();
+
+  Future<void> _send() async {
+    if (_msg.text.trim().isEmpty) return;
+    final user = FirebaseAuth.instance.currentUser;
+    await FirebaseFirestore.instance.collection('chat').add({
+      'text': _msg.text.trim(),
+      'uid': user?.uid,
+      'ts': FieldValue.serverTimestamp(),
+    });
+    _msg.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = FirebaseFirestore.instance
+        .collection('chat')
+        .orderBy('ts', descending: true);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('الشات')),
+      body: Column(
+        children: [
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: q.snapshots(),
+              builder: (ctx, snap) {
+                if (snap.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final docs = snap.data?.docs ?? [];
+                if (docs.isEmpty) {
+                  return EmptyHint(
+                    icon: Icons.forum_outlined,
+                    title: 'ابدأ المحادثة!',
+                    subtitle: 'أضف أول رسالة الآن.',
+                  );
+                }
+                return ListView.builder(
+                  reverse: true,
+                  itemCount: docs.length,
+                  itemBuilder: (_, i) {
+                    final d = docs[i].data();
+                    return ListTile(
+                      leading: const Icon(Icons.chat_bubble_outline),
+                      title: Text(d['text'] ?? ''),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: Row(
+              children: [
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _msg,
+                    decoration: const InputDecoration(
+                      hintText: 'اكتب رسالة...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _send,
+                  icon: const Icon(Icons.send_rounded),
+                ),
+                const SizedBox(width: 4),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// Faculties → Majors → Curriculum (grid-like GPA table)
 // ============================================================================
 
-/// حالة فارغة قابلة لإعادة الاستخدام (لا تُنشأ بـ const في الأماكن الديناميكية)
+class Faculty {
+  final String name;
+  final List<Major> majors;
+  Faculty({required this.name, required this.majors});
+}
+
+class Major {
+  final String name;
+  final List<ModuleRow> sem1;
+  final List<ModuleRow> sem2;
+  Major({required this.name, required this.sem1, required this.sem2});
+}
+
+// صف في الجدول
+class ModuleRow {
+  final String module;
+  int coef;
+  int cred;
+  // درجات TD/EXAM أو أي ملاحظات
+  double td;
+  double exam;
+
+  ModuleRow({
+    required this.module,
+    required this.coef,
+    required this.cred,
+    this.td = 0,
+    this.exam = 0,
+  });
+
+  double get moyenne => ((td * 0.3) + (exam * 0.7));
+  int get credMod => moyenne >= 10 ? cred : 0;
+}
+
+final demoFaculties = <Faculty>[
+  Faculty(
+    name: 'كلية العلوم الإقتصادية',
+    majors: [
+      Major(
+        name: 'علوم التسيير',
+        sem1: [
+          ModuleRow(module: 'Analyse 1', coef: 4, cred: 6),
+          ModuleRow(module: 'Algèbre 1', coef: 3, cred: 5),
+          ModuleRow(module: 'Algorithmique 1', coef: 4, cred: 6),
+          ModuleRow(module: 'Structure machine 1', coef: 3, cred: 5),
+          ModuleRow(module: 'Terminologie', coef: 2, cred: 2),
+          ModuleRow(module: 'Physique 1', coef: 2, cred: 4),
+          ModuleRow(module: 'Langue', coef: 1, cred: 2),
+          ModuleRow(module: 'Découverte', coef: 2, cred: 4),
+        ],
+        sem2: [
+          ModuleRow(module: 'Analyse 2', coef: 4, cred: 6),
+          ModuleRow(module: 'Algèbre 2', coef: 2, cred: 4),
+          ModuleRow(module: 'Algorithmique 2', coef: 4, cred: 6),
+          ModuleRow(module: 'Structure machine 2', coef: 2, cred: 4),
+          ModuleRow(module: 'Proba/Stats', coef: 3, cred: 5),
+          ModuleRow(module: 'TIC', coef: 1, cred: 2),
+          ModuleRow(module: 'Programmation', coef: 2, cred: 4),
+          ModuleRow(module: 'Physique 2', coef: 3, cred: 5),
+          ModuleRow(module: 'Découverte', coef: 2, cred: 4),
+        ],
+      ),
+      Major(
+        name: 'علوم تجارية',
+        sem1: [
+          ModuleRow(module: 'Economie 1', coef: 3, cred: 5),
+          ModuleRow(module: 'Gestion 1', coef: 3, cred: 5),
+        ],
+        sem2: [
+          ModuleRow(module: 'Economie 2', coef: 3, cred: 5),
+          ModuleRow(module: 'Gestion 2', coef: 3, cred: 5),
+        ],
+      ),
+    ],
+  ),
+  Faculty(
+    name: 'كلية الحقوق',
+    majors: [
+      Major(
+        name: 'قانون عام',
+        sem1: [ModuleRow(module: 'مدخل قانون', coef: 2, cred: 3)],
+        sem2: [ModuleRow(module: 'دستوري', coef: 2, cred: 3)],
+      ),
+    ],
+  ),
+];
+
+class FacultiesScreen extends StatelessWidget {
+  final List<Faculty> faculties;
+  const FacultiesScreen({super.key, required this.faculties});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('الكليات')),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: faculties.length,
+        itemBuilder: (_, i) {
+          final f = faculties[i];
+          return Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading: const Icon(Icons.account_balance_outlined),
+              title: Text(f.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => FacultyMajorsScreen(faculty: f),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class FacultyMajorsScreen extends StatelessWidget {
+  final Faculty faculty;
+  const FacultyMajorsScreen({super.key, required this.faculty});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(faculty.name)),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: faculty.majors.length,
+        itemBuilder: (_, i) {
+          final m = faculty.majors[i];
+          return Card(
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            child: ListTile(
+              leading: const Icon(Icons.home_work_outlined),
+              title: Text(m.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => CurriculumScreen(major: m, title: m.name),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// شاشة المنهاج/الجدول: جدول شبكي بحدود وخلايا + ملخص Sem1/Sem2/Année
+// ============================================================================
+class CurriculumScreen extends StatefulWidget {
+  final Major major;
+  final String title;
+  const CurriculumScreen({super.key, required this.major, required this.title});
+
+  @override
+  State<CurriculumScreen> createState() => _CurriculumScreenState();
+}
+
+class _CurriculumScreenState extends State<CurriculumScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tab;
+
+  @override
+  void initState() {
+    super.initState();
+    _tab = TabController(length: 2, vsync: this);
+  }
+
+  double _avg(List<ModuleRow> rows) =>
+      rows.isEmpty ? 0 : rows.map((e) => e.moyenne).reduce((a, b) => a + b) / rows.length;
+
+  int _creditsValidated(List<ModuleRow> rows) =>
+      rows.fold(0, (p, e) => p + e.credMod);
+
+  @override
+  Widget build(BuildContext context) {
+    final sem1 = widget.major.sem1;
+    final sem2 = widget.major.sem2;
+
+    final s1Avg = _avg(sem1);
+    final s2Avg = _avg(sem2);
+    final yAvg = (s1Avg + s2Avg) / 2.0;
+
+    final s1Cred = _creditsValidated(sem1);
+    final s2Cred = _creditsValidated(sem2);
+    final yCred = s1Cred + s2Cred;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title),
+        bottom: TabBar(
+          controller: _tab,
+          tabs: const [
+            Tab(text: 'SEMESTER 1'),
+            Tab(text: 'SEMESTER 2'),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: TabBarView(
+              controller: _tab,
+              children: [
+                _SemesterGrid(
+                  rows: sem1,
+                  onChange: () => setState(() {}),
+                ),
+                _SemesterGrid(
+                  rows: sem2,
+                  onChange: () => setState(() {}),
+                ),
+              ],
+            ),
+          ),
+
+          // ملخص سفلي مثل الصورة
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: _SummaryTable(
+              sem1Avg: s1Avg,
+              sem2Avg: s2Avg,
+              sem1Cred: s1Cred,
+              sem2Cred: s2Cred,
+              yearAvg: yAvg,
+              yearCred: yCred,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// جدول فصل واحد (Grid مع حدود)
+class _SemesterGrid extends StatelessWidget {
+  final List<ModuleRow> rows;
+  final VoidCallback onChange;
+  const _SemesterGrid({required this.rows, required this.onChange});
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(12),
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowColor:
+                MaterialStatePropertyAll(Colors.grey.shade300),
+            columns: const [
+              DataColumn(label: Text('Modules')),
+              DataColumn(label: Text('Coef')),
+              DataColumn(label: Text('Cred')),
+              DataColumn(label: Text('Note')),
+              DataColumn(label: Text('Moyenne module')),
+              DataColumn(label: Text('Cred Mod')),
+            ],
+            rows: rows.map((r) {
+              return DataRow(cells: [
+                DataCell(Text(r.module)),
+                DataCell(_IntEditable(
+                  value: r.coef,
+                  onChanged: (v) { r.coef = v; onChange(); },
+                )),
+                DataCell(_IntEditable(
+                  value: r.cred,
+                  onChanged: (v) { r.cred = v; onChange(); },
+                )),
+                DataCell(_NoteCell(
+                  td: r.td, exam: r.exam,
+                  onChanged: (td, ex) { r.td = td; r.exam = ex; onChange(); },
+                )),
+                DataCell(Text(r.moyenne.toStringAsFixed(2))),
+                DataCell(Text(r.credMod.toString())),
+              ]);
+            }).toList(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// خلية إدخال رقم صحيح
+class _IntEditable extends StatefulWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+  const _IntEditable({required this.value, required this.onChanged});
+  @override
+  State<_IntEditable> createState() => _IntEditableState();
+}
+class _IntEditableState extends State<_IntEditable> {
+  late final TextEditingController _c;
+  @override
+  void initState() {
+    super.initState();
+    _c = TextEditingController(text: widget.value.toString());
+  }
+  @override
+  void dispose() { _c.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 56,
+      child: TextField(
+        controller: _c,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(isDense: true, border: InputBorder.none),
+        onChanged: (v) {
+          final n = int.tryParse(v) ?? widget.value;
+          widget.onChanged(n);
+        },
+      ),
+    );
+  }
+}
+
+// خلية إدخال (TD/EXAM 30%/70%) مع منزلقات
+class _NoteCell extends StatefulWidget {
+  final double td;
+  final double exam;
+  final void Function(double td, double exam) onChanged;
+  const _NoteCell({required this.td, required this.exam, required this.onChanged});
+  @override
+  State<_NoteCell> createState() => _NoteCellState();
+}
+
+class _NoteCellState extends State<_NoteCell> {
+  late double _td = widget.td;
+  late double _ex = widget.exam;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 220,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Row(
+            children: [
+              const Text('30% TD'),
+              Expanded(
+                child: Slider(
+                  value: _td, min: 0, max: 20, divisions: 40,
+                  label: _td.toStringAsFixed(1),
+                  onChanged: (v) => setState(() { _td = v; widget.onChanged(_td, _ex); }),
+                ),
+              ),
+              SizedBox(width: 32, child: Text(_td.toStringAsFixed(1), textAlign: TextAlign.end)),
+            ],
+          ),
+          Row(
+            children: [
+              const Text('70% EXAM'),
+              Expanded(
+                child: Slider(
+                  value: _ex, min: 0, max: 20, divisions: 40,
+                  label: _ex.toStringAsFixed(1),
+                  onChanged: (v) => setState(() { _ex = v; widget.onChanged(_td, _ex); }),
+                ),
+              ),
+              SizedBox(width: 32, child: Text(_ex.toStringAsFixed(1), textAlign: TextAlign.end)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ملخص سفلي مطابق لفكرة الصورة (ثلاثة صفوف)
+class _SummaryTable extends StatelessWidget {
+  final double sem1Avg, sem2Avg, yearAvg;
+  final int sem1Cred, sem2Cred, yearCred;
+  const _SummaryTable({
+    required this.sem1Avg,
+    required this.sem2Avg,
+    required this.yearAvg,
+    required this.sem1Cred,
+    required this.sem2Cred,
+    required this.yearCred,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final border = TableBorder.all(color: Colors.black26, width: 1);
+    Text _cell(String s, {bool head = false}) => Text(
+      s,
+      textAlign: TextAlign.center,
+      style: TextStyle(
+        fontWeight: head ? FontWeight.w700 : FontWeight.w500,
+      ),
+    );
+
+    return Card(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Table(
+        border: border,
+        columnWidths: const {
+          0: FlexColumnWidth(1.4),
+          1: FlexColumnWidth(1),
+          2: FlexColumnWidth(1),
+        },
+        children: [
+          TableRow(
+            decoration: BoxDecoration(color: Colors.grey.shade300),
+            children: [
+              Padding(padding: const EdgeInsets.all(8), child: _cell('Semestre/année', head: true)),
+              Padding(padding: const EdgeInsets.all(8), child: _cell('Moyenne', head: true)),
+              Padding(padding: const EdgeInsets.all(8), child: _cell('Crédits', head: true)),
+            ],
+          ),
+          TableRow(children: [
+            Padding(padding: const EdgeInsets.all(8), child: _cell('semestre1')),
+            Padding(padding: const EdgeInsets.all(8), child: _cell(sem1Avg.toStringAsFixed(2))),
+            Padding(padding: const EdgeInsets.all(8), child: _cell(sem1Cred.toString())),
+          ]),
+          TableRow(children: [
+            Padding(padding: const EdgeInsets.all(8), child: _cell('semestre2')),
+            Padding(padding: const EdgeInsets.all(8), child: _cell(sem2Avg.toStringAsFixed(2))),
+            Padding(padding: const EdgeInsets.all(8), child: _cell(sem2Cred.toString())),
+          ]),
+          TableRow(children: [
+            Padding(padding: const EdgeInsets.all(8), child: _cell('Année')),
+            Padding(padding: const EdgeInsets.all(8), child: _cell(yearAvg.toStringAsFixed(2))),
+            Padding(padding: const EdgeInsets.all(8), child: _cell(yearCred.toString())),
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// Calculator (يدخلك إلى نفس الجدول عبر اختيار تخصّص تجريبي بسرعة)
+// ============================================================================
+class CalculatorScreen extends StatelessWidget {
+  const CalculatorScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final f = demoFaculties.first;
+    final m = f.majors.first;
+    return CurriculumScreen(major: m, title: '${f.name} • ${m.name}');
+  }
+}
+// ============================================================================
+// Helpers & styling (safe to append; no duplicate classes here)
+// ============================================================================
+
+// خلفية هادئة للـ Home/Community
+
+
+// لون خلفية للوسوم (Chip) – يمكن تعديله بحرية
+
+
+// (اختياري) فواصل صغنونة متسقة
+Widget vgap([double h = 8]) => SizedBox(height: h);
+Widget hgap([double w = 8]) => SizedBox(width: w);
+
+// (اختياري) نمط نص صغير رمادي
+TextStyle get _muted =>
+    const TextStyle(fontSize: 12, color: Colors.black54);
+
+// ============================================================================
+// انتهى الملف ✅
+// ============================================================================
+// ويدجت خفيفة لعرض حالة فارغة (مُعاد تعريفها هنا مرة واحدة فقط)
 class EmptyHint extends StatelessWidget {
   final IconData icon;
   final String title;
   final String? subtitle;
-  const EmptyHint({super.key, required this.icon, required this.title, this.subtitle});
+
+  const EmptyHint({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.subtitle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -677,1385 +1696,22 @@ class EmptyHint extends StatelessWidget {
           children: [
             Icon(icon, size: 56, color: Colors.grey.shade500),
             const SizedBox(height: 10),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
             if (subtitle != null) ...[
               const SizedBox(height: 6),
-              Text(subtitle!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.black54)),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// امتداد آمن للسلاسل
-extension SafeStringExt on String {
-  String ellipsize(int max, {String ellipsis = '…'}) {
-    if (length <= max) return this;
-    if (max <= 0) return '';
-    return substring(0, max) + ellipsis;
-  }
-}
-
-// ============================================================================
-// مجتمع (إصدار مطوّر يشبه Reddit) — الجزء الأول من الواجهة
-// ============================================================================
-
-enum PostSort { newest, top }
-
-class CommunityScreen extends StatefulWidget {
-  const CommunityScreen({super.key});
-  @override
-  State<CommunityScreen> createState() => _CommunityScreenState();
-}
-
-class _CommunityScreenState extends State<CommunityScreen>
-    with AutomaticKeepAliveClientMixin {
-  final _postCtrl = TextEditingController();
-  final _tagCtrl = TextEditingController();
-  final _searchCtrl = TextEditingController();
-
-  final ImagePicker _picker = ImagePicker();
-  XFile? _picked;
-  String? _pickedType; // 'image' | 'video'
-
-  PostSort _sort = PostSort.newest;
-  String? _queryTag;
-  String? _queryText;
-
-  bool _sending = false;
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void dispose() {
-    _postCtrl.dispose();
-    _tagCtrl.dispose();
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickImage() async {
-    final img = await _picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
-    );
-    if (img != null) {
-      setState(() {
-        _picked = img;
-        _pickedType = 'image';
-      });
-    }
-  }
-
-  Future<void> _pickVideo() async {
-    final vid = await _picker.pickVideo(source: ImageSource.gallery);
-    if (vid != null) {
-      setState(() {
-        _picked = vid;
-        _pickedType = 'video';
-      });
-    }
-  }
-
-  Future<String?> _uploadPicked() async {
-    if (_picked == null) return null;
-    final name = '${DateTime.now().millisecondsSinceEpoch}_${_picked!.name}';
-    final ref = FirebaseStorage.instance.ref('community/$name');
-    final data = await _picked!.readAsBytes();
-    final meta = SettableMetadata(
-      contentType: _pickedType == 'video' ? 'video/mp4' : 'image/jpeg',
-    );
-    await ref.putData(Uint8List.fromList(data), meta);
-    return await ref.getDownloadURL();
-  }
-
-  Future<void> _sendPost() async {
-    final text = _postCtrl.text.trim();
-    if (text.isEmpty && _picked == null) return;
-
-    setState(() => _sending = true);
-    try {
-      String? mediaUrl;
-      if (_picked != null) {
-        mediaUrl = await _uploadPicked();
-      }
-
-      final user = FirebaseAuth.instance.currentUser;
-      final tags = _tagCtrl.text
-          .split(RegExp(r'[,\s]+'))
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
-
-      await FirebaseFirestore.instance.collection('posts').add({
-        'text': text,
-        'mediaUrl': mediaUrl,
-        'mediaType': _pickedType, // image | video | null
-        'tags': tags,
-        'likes': 0,
-        'createdAt': FieldValue.serverTimestamp(),
-        'uid': user?.uid,
-        'author': user?.email?.split('@').first ?? 'طالب مجهول',
-      });
-
-      _postCtrl.clear();
-      _tagCtrl.clear();
-      setState(() {
-        _picked = null;
-        _pickedType = null;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('تعذّر النشر: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  Query<Map<String, dynamic>> _query() {
-    Query<Map<String, dynamic>> q =
-        FirebaseFirestore.instance.collection('posts');
-
-    if (_queryText != null && _queryText!.isNotEmpty) {
-      q = q.where('text', isGreaterThanOrEqualTo: _queryText)
-          .where('text', isLessThan: '${_queryText!}~'); // prefix search
-    }
-    if (_queryTag != null && _queryTag!.isNotEmpty) {
-      q = q.where('tags', arrayContains: _queryTag);
-    }
-
-    if (_sort == PostSort.newest) {
-      q = q.orderBy('createdAt', descending: true);
-    } else {
-      q = q.orderBy('likes', descending: true).orderBy('createdAt', descending: true);
-    }
-    return q.limit(50);
-  }
-
-  Future<void> _toggleLike(DocumentSnapshot d) async {
-    final doc = d.reference;
-    await FirebaseFirestore.instance.runTransaction((trx) async {
-      final snap = await trx.get(doc);
-      final likes = (snap['likes'] ?? 0) as int;
-      trx.update(doc, {'likes': likes + 1});
-    });
-  }
-
-  Future<void> _addComment(DocumentReference postRef, String text) async {
-    if (text.trim().isEmpty) return;
-    final user = FirebaseAuth.instance.currentUser;
-    await postRef.collection('comments').add({
-      'text': text.trim(),
-      'createdAt': FieldValue.serverTimestamp(),
-      'author': user?.email?.split('@').first ?? 'طالب مجهول',
-      'uid': user?.uid,
-    });
-  }
-
-  void _openComments(DocumentSnapshot post) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => _CommentsSheet(
-        post: post,
-        onSend: (t) => _addComment(post.reference, t),
-      ),
-    );
-  }
-
-  Set<String> _uniqueTags(AsyncSnapshot<QuerySnapshot> snap) {
-    final tags = <String>{};
-    for (final d in snap.data!.docs) {
-      final list = (d['tags'] ?? []) as List;
-      tags.addAll(list.map((e) => e.toString()));
-    }
-    return tags;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-
-    return BaseScaffold(
-      title: 'المجتمع',
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _query().snapshots(),
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final docs = snap.data?.docs ?? [];
-          final tags = _uniqueTags(snap);
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 110),
-            children: [
-              // محرّر المنشور
-              _Composer(
-                postCtrl: _postCtrl,
-                tagCtrl: _tagCtrl,
-                sending: _sending,
-                picked: _picked,
-                pickedType: _pickedType,
-                onPickImage: _pickImage,
-                onPickVideo: _pickVideo,
-                onClearPick: () => setState(() {
-                  _picked = null;
-                  _pickedType = null;
-                }),
-                onSend: _sendPost,
-              ),
-
-              const SizedBox(height: 12),
-
-              // بحث + فرز
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (v) => setState(() => _queryText = v.trim().isEmpty ? null : v.trim()),
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.search),
-                        hintText: 'بحث في المنشورات...',
-                        border: OutlineInputBorder(),
-                        isDense: true,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SegmentedButton<PostSort>(
-                    segments: const [
-                      ButtonSegment(value: PostSort.newest, icon: Icon(Icons.fiber_new), label: Text('الأحدث')),
-                      ButtonSegment(value: PostSort.top, icon: Icon(Icons.trending_up), label: Text('الأكثر إعجابًا')),
-                    ],
-                    selected: {_sort},
-                    onSelectionChanged: (s) => setState(() => _sort = s.first),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // وسوم شبيهة بالـ subreddits (فلترة)
-              if (tags.isNotEmpty) ...[
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: tags.map((t) {
-                    final selected = _queryTag == t;
-                    return ChoiceChip(
-                      label: Text('#$t'),
-                      selected: selected,
-                      onSelected: (_) => setState(() {
-                        _queryTag = selected ? null : t;
-                      }),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 10),
-              ],
-
-              if (docs.isEmpty)
-                EmptyHint(
-                  icon: Icons.hourglass_empty_outlined,
-                  title: 'لا توجد منشورات بعد',
-                  subtitle: 'كن أوّل من يشارك منشورًا!',
-                )
-              else
-                ...docs.map((d) => _PostCard(
-                      data: d,
-                      onLike: () => _toggleLike(d),
-                      onComments: () => _openComments(d),
-                    )),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-// ============================================================================
-// Fachub — main.dart (FULL, FIXED & ENHANCED) — PART 2/3
-// (يتبع من الجزء 1/3)
-// ============================================================================
-
-// ---------------- بطاقة منشور (عرض يشبه Reddit) ----------------
-class _PostCard extends StatelessWidget {
-  final DocumentSnapshot data;
-  final VoidCallback onLike;
-  final VoidCallback onComments;
-
-  const _PostCard({
-    required this.data,
-    required this.onLike,
-    required this.onComments,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final d = data.data() as Map<String, dynamic>;
-    final text = (d['text'] ?? '') as String;
-    final author = (d['author'] ?? 'طالب مجهول') as String;
-    final likes = (d['likes'] ?? 0) as int;
-    final ts = (d['createdAt'] as Timestamp?);
-    final when = ts != null ? DateFormat('HH:mm • yyyy/MM/dd').format(ts.toDate()) : '—';
-    final mediaUrl = d['mediaUrl'] as String?;
-    final mediaType = d['mediaType'] as String?;
-    final tags = (d['tags'] ?? []) as List;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // رأس البطاقة: معلومات الكاتب والتاريخ
-            Row(
-              children: [
-                const CircleAvatar(radius: 16, child: Icon(Icons.person, size: 18)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(author, style: const TextStyle(fontWeight: FontWeight.w700)),
-                ),
-                Text(when, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-              ],
-            ),
-            if (text.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Text(text, style: const TextStyle(fontSize: 15)),
-            ],
-
-            if (mediaUrl != null) ...[
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: mediaType == 'video'
-                    ? _VideoThumb(url: mediaUrl)
-                    : Image.network(mediaUrl, fit: BoxFit.cover),
-              ),
-            ],
-
-            if (tags.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: tags.map<Widget>((t) {
-                  return Chip(
-                    label: Text('#$t'),
-                    // لا يوجد onPressed للـ Chip الحديثة؛ استخدم onSelected في ChoiceChip عند الحاجة
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  );
-                }).toList(),
-              ),
-            ],
-
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                IconButton(
-                  onPressed: onLike,
-                  icon: const Icon(Icons.favorite_border),
-                ),
-                Text('إعجاب $likes'),
-                const SizedBox(width: 10),
-                IconButton(
-                  onPressed: onComments,
-                  icon: const Icon(Icons.chat_bubble_outline),
-                ),
-                const Text('تعليقات'),
-                const Spacer(),
-                IconButton(
-                  onPressed: () {
-                    final dRef = data.reference;
-                    dRef.delete();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('تم حذف المنشور')),
-                    );
-                  },
-                  icon: const Icon(Icons.more_horiz),
-                  tooltip: 'حذف (للتجربة)',
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// صورة معاينة للفيديو (ثابتة بسيطة: نستخدم أيقونة تشغيل فوق صورة مصغرة من الشبكة إن كانت mp4)
-// يمكنك لاحقًا استبداله بمشغّل فيديو (video_player) إن رغبت.
-class _VideoThumb extends StatelessWidget {
-  final String url;
-  const _VideoThumb({required this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        AspectRatio(
-          aspectRatio: 16 / 9,
-          child: Container(
-            color: Colors.black12,
-            child: const Center(child: Icon(Icons.ondemand_video, size: 64)),
-          ),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.black45,
-            borderRadius: BorderRadius.circular(50),
-          ),
-          padding: const EdgeInsets.all(10),
-          child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 38),
-        ),
-      ],
-    );
-  }
-}
-
-// محرّر المنشور (Composer)
-class _Composer extends StatelessWidget {
-  final TextEditingController postCtrl;
-  final TextEditingController tagCtrl;
-  final bool sending;
-  final XFile? picked;
-  final String? pickedType;
-  final VoidCallback onPickImage;
-  final VoidCallback onPickVideo;
-  final VoidCallback onClearPick;
-  final VoidCallback onSend;
-
-  const _Composer({
-    required this.postCtrl,
-    required this.tagCtrl,
-    required this.sending,
-    required this.picked,
-    required this.pickedType,
-    required this.onPickImage,
-    required this.onPickVideo,
-    required this.onClearPick,
-    required this.onSend,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0.5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          children: [
-            TextField(
-              controller: postCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                hintText: 'شارك سؤالًا أو تجربة أو معلومة...',
-                border: OutlineInputBorder(),
-                suffixIcon: Icon(Icons.edit_outlined),
-              ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                FilledButton.icon(
-                  onPressed: sending ? null : onSend,
-                  icon: const Icon(Icons.send_rounded),
-                  label: const Text('نشر'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: sending ? null : onPickImage,
-                  icon: const Icon(Icons.image_outlined),
-                  label: const Text('صورة'),
-                ),
-                const SizedBox(width: 6),
-                OutlinedButton.icon(
-                  onPressed: sending ? null : onPickVideo,
-                  icon: const Icon(Icons.videocam_outlined),
-                  label: const Text('فيديو'),
-                ),
-                const Spacer(),
-                if (picked != null)
-                  Text(
-                    picked!.name.ellipsize(30),
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                if (picked != null)
-                  IconButton(
-                    onPressed: onClearPick,
-                    icon: const Icon(Icons.close),
-                    tooltip: 'إزالة الوسائط',
-                  ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: tagCtrl,
-              decoration: const InputDecoration(
-                hintText: 'وسوم مفصولة بمسافة أو فاصلة…',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.tag),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------- التعليقات ----------------
-class _CommentsSheet extends StatefulWidget {
-  final DocumentSnapshot post;
-  final Future<void> Function(String) onSend;
-  const _CommentsSheet({required this.post, required this.onSend});
-
-  @override
-  State<_CommentsSheet> createState() => _CommentsSheetState();
-}
-
-class _CommentsSheetState extends State<_CommentsSheet> {
-  final _ctrl = TextEditingController();
-  bool _sending = false;
-
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _send() async {
-    if (_ctrl.text.trim().isEmpty) return;
-    setState(() => _sending = true);
-    try {
-      await widget.onSend(_ctrl.text.trim());
-      _ctrl.clear();
-    } finally {
-      if (mounted) setState(() => _sending = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ref = widget.post.reference.collection('comments').orderBy('createdAt', descending: true);
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.7,
-          minChildSize: 0.5,
-          builder: (context, controller) {
-            return Column(
-              children: [
-                const SizedBox(height: 10),
-                Container(width: 48, height: 4, decoration: BoxDecoration(color: Colors.grey.shade400, borderRadius: BorderRadius.circular(8))),
-                const SizedBox(height: 10),
-                const Text('التعليقات', style: TextStyle(fontWeight: FontWeight.bold)),
-                const Divider(),
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: ref.snapshots(),
-                    builder: (context, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      final docs = snap.data?.docs ?? [];
-                      if (docs.isEmpty) {
-                        return EmptyHint(
-                          icon: Icons.forum_outlined,
-                          title: 'ابدأ المحادثة ✨',
-                          subtitle: 'أضف أول تعليق الآن.',
-                        );
-                      }
-                      return ListView.builder(
-                        controller: controller,
-                        reverse: false,
-                        itemCount: docs.length,
-                        itemBuilder: (_, i) {
-                          final d = docs[i].data() as Map<String, dynamic>;
-                          final text = (d['text'] ?? '') as String;
-                          final author = (d['author'] ?? 'طالب') as String;
-                          final ts = d['createdAt'] as Timestamp?;
-                          final when = ts != null ? DateFormat('HH:mm • yyyy/MM/dd').format(ts.toDate()) : '';
-                          return ListTile(
-                            leading: const Icon(Icons.chat_bubble_outline),
-                            title: Text(text),
-                            subtitle: Text('$author • $when'),
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-                SafeArea(
-                  top: false,
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _ctrl,
-                            decoration: const InputDecoration(
-                              hintText: 'اكتب تعليقًا…',
-                              border: OutlineInputBorder(),
-                              isDense: true,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: _sending ? null : _send,
-                          child: const Text('إرسال'),
-                        ),
-                      ],
-                    ),
-                  ),
-                )
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------- الشات البسيط (محلي) ----------------
-class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
-  @override
-  State<ChatScreen> createState() => _ChatScreenState();
-}
-
-class _ChatScreenState extends State<ChatScreen> {
-  final msgCtrl = TextEditingController();
-  final msgs = <String>[];
-
-  void _send() {
-    final txt = msgCtrl.text.trim();
-    if (txt.isEmpty) return;
-    setState(() {
-      msgs.insert(0, txt);
-      msgCtrl.clear();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: 'الشات',
-      body: Column(
-        children: [
-          Expanded(
-            child: msgs.isEmpty
-                ? EmptyHint(
-                    icon: Icons.forum_outlined,
-                    title: 'ابدأ المحادثة ✨',
-                    subtitle: 'أضف أول رسالة الآن.',
-                  )
-                : ListView.builder(
-                    reverse: true,
-                    itemCount: msgs.length,
-                    itemBuilder: (_, i) => ListTile(
-                      leading: const Icon(Icons.chat_bubble_outline),
-                      title: Text(msgs[i]),
-                    ),
-                  ),
-          ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: msgCtrl,
-                      decoration: const InputDecoration(
-                        hintText: 'اكتب رسالة...',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(onPressed: _send, child: const Text('إرسال')),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------- الواجهة الرئيسية (NavigationBar) ----------------
-class HomeTabs extends StatefulWidget {
-  const HomeTabs({super.key});
-  @override
-  State<HomeTabs> createState() => _HomeTabsState();
-}
-
-class _HomeTabsState extends State<HomeTabs> {
-  int _index = 1; // المجتمع واجهة رئيسية افتراضيًا
-
-  final pages = const [
-    CalculatorScreen(),
-    CommunityScreen(),
-    ChatScreen(),
-    SettingsScreen(),
-    AccountScreen(),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      endDrawer: const AppEndDrawer(),
-      body: pages[_index],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.calculate_outlined), label: 'الحاسبة'),
-          NavigationDestination(icon: Icon(Icons.public_outlined), label: 'المجتمع'),
-          NavigationDestination(icon: Icon(Icons.chat_bubble_outline), label: 'الشات'),
-          NavigationDestination(icon: Icon(Icons.settings_outlined), label: 'الإعدادات'),
-          NavigationDestination(icon: Icon(Icons.person_outline), label: 'الحساب'),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// الدراسة (الكليات → التخصصات → الفروع)
-// ============================================================================
-
-// نموذج تمثيلي للبيانات
-final demoFaculties = [
-  Faculty(
-    name: 'كلية العلوم الاقتصادية والتجارية وعلوم التسيير',
-    majors: [
-      Major(
-        name: 'علوم التسيير',
-        tracks: [
-          'تسيير الموارد البشرية',
-          'تسويق',
-          'مالية ومحاسبة',
-          'إدارة الأعمال',
-        ],
-      ),
-      Major(
-        name: 'العلوم الاقتصادية',
-        tracks: [
-          'اقتصاد دولي',
-          'اقتصاد نقدي ومالي',
-          'اقتصاد وتسيير المؤسسات',
-        ],
-      ),
-    ],
-  ),
-  Faculty(
-    name: 'كلية التكنولوجيا',
-    majors: [
-      Major(
-        name: 'هندسة مدنية',
-        tracks: ['منشآت', 'طرق وجسور', 'هندسة معمارية'],
-      ),
-      Major(
-        name: 'هندسة كهربائية',
-        tracks: ['الكترونيك', 'كهرباء صناعية', 'طاقة'],
-      ),
-    ],
-  ),
-];
-
-// نماذج البيانات
-class Faculty {
-  final String name;
-  final List<Major> majors;
-  Faculty({required this.name, required this.majors});
-}
-
-class Major {
-  final String name;
-  final List<String> tracks;
-  Major({required this.name, required this.tracks});
-}
-
-// واجهة عرض الكليات
-class FacultiesScreen extends StatelessWidget {
-  final List<Faculty> faculties;
-  const FacultiesScreen({super.key, required this.faculties});
-
-  @override
-  Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: 'الكليات',
-      body: ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: faculties.length,
-        itemBuilder: (_, i) {
-          final f = faculties[i];
-          return Card(
-            child: ListTile(
-              leading: const Icon(Icons.account_balance),
-              title: Text(f.name),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => FacultyMajorsScreen(faculty: f),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// واجهة عرض التخصصات لكل كلية
-class FacultyMajorsScreen extends StatelessWidget {
-  final Faculty faculty;
-  const FacultyMajorsScreen({super.key, required this.faculty});
-
-  @override
-  Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: faculty.name,
-      body: ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: faculty.majors.length,
-        itemBuilder: (_, i) {
-          final m = faculty.majors[i];
-          return Card(
-            child: ListTile(
-              leading: const Icon(Icons.school_outlined),
-              title: Text(m.name),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => MajorTracksScreen(major: m),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-// واجهة عرض الفروع
-class MajorTracksScreen extends StatelessWidget {
-  final Major major;
-  const MajorTracksScreen({super.key, required this.major});
-
-  @override
-  Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: major.name,
-      body: ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: major.tracks.length,
-        itemBuilder: (_, i) {
-          final t = major.tracks[i];
-          return Card(
-            child: ListTile(
-              leading: const Icon(Icons.menu_book_outlined),
-              title: Text(t),
-              trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 18),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => SemesterTableCalculatorScreen(title: t),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-// ============================================================================
-// Fachub — main.dart (FULL, FIXED & ENHANCED) — PART 3/3
-// (تكملة من الجزء 2/3)
-// ============================================================================
-
-class SemesterTableCalculatorScreen extends StatefulWidget {
-  final String title; // اسم الفرع (مثلاً: تسويق)
-  const SemesterTableCalculatorScreen({super.key, required this.title});
-
-  @override
-  State<SemesterTableCalculatorScreen> createState() =>
-      _SemesterTableCalculatorScreenState();
-}
-
-// إعدادات موديول (اسم+معامل+رصيد+نِسَب TD/TP/EXAM)
-class _ModuleCfg {
-  String name;
-  int coef;
-  int cred;
-  double tdW;   // 0..1
-  double tpW;   // 0..1
-  double examW; // 0..1
-
-  // العلامات
-  double td = 0;
-  double tp = 0;
-  double exam = 0;
-
-  _ModuleCfg({
-    required this.name,
-    required this.coef,
-    required this.cred,
-    this.tdW = 0.3,
-    this.tpW = 0.0,
-    this.examW = 0.7,
-  });
-
-  double get moyenne {
-    final totalW = tdW + tpW + examW;
-    if (totalW <= 0) return 0;
-    return (td * tdW + tp * tpW + exam * examW) / totalW;
-  }
-}
-
-class _SemesterCfg {
-  final String name; // S1 أو S2
-  final List<_ModuleCfg> modules;
-  _SemesterCfg(this.name, this.modules);
-
-  double get avg {
-    if (modules.isEmpty) return 0;
-    double wSum = 0, s = 0;
-    for (final m in modules) {
-      wSum += m.coef.toDouble();
-      s += m.moyenne * m.coef;
-    }
-    return wSum == 0 ? 0 : s / wSum;
-  }
-
-  int get creditsValidated {
-    int c = 0;
-    for (final m in modules) {
-      if (m.moyenne >= 10) c += m.cred;
-    }
-    return c;
-  }
-
-  int get totalCredits => modules.fold(0, (p, m) => p + m.cred);
-}
-
-// تكوين افتراضي مطابق للصورة (شكل عام L1MI)
-_SemesterCfg _buildS1() {
-  return _SemesterCfg('SEMESTER 1', [
-    _ModuleCfg(name: 'Analyse 1',      coef: 4, cred: 6, tdW: .3, tpW: 0,   examW: .7),
-    _ModuleCfg(name: 'Algèbre 1',      coef: 3, cred: 5, tdW: .3, tpW: 0,   examW: .7),
-    _ModuleCfg(name: 'Algorithmique 1',coef: 4, cred: 6, tdW: .2, tpW: .2, examW: .6),
-    _ModuleCfg(name: 'Structure machine 1', coef: 3, cred: 4, tdW: .3, tpW: 0, examW: .7),
-    _ModuleCfg(name: 'Terminologie scientifique', coef: 1, cred: 2, tdW: 0, tpW: 0, examW: 1),
-    _ModuleCfg(name: 'Langue Étrangère 1',       coef: 1, cred: 2, tdW: 0, tpW: 0, examW: 1),
-    _ModuleCfg(name: 'Physique 1',     coef: 2, cred: 4, tdW: .2, tpW: 0,   examW: .8),
-    _ModuleCfg(name: 'Unité Découverte', coef: 2, cred: 2, tdW: 0, tpW: 0, examW: 1),
-  ]);
-}
-
-_SemesterCfg _buildS2() {
-  return _SemesterCfg('SEMESTER 2', [
-    _ModuleCfg(name: 'Analyse 2',            coef: 4, cred: 6, tdW: .3, tpW: 0,   examW: .7),
-    _ModuleCfg(name: 'Algèbre 2',            coef: 2, cred: 4, tdW: .3, tpW: 0,   examW: .7),
-    _ModuleCfg(name: 'Algorithmique 2',      coef: 4, cred: 6, tdW: .2, tpW: .2, examW: .6),
-    _ModuleCfg(name: 'Structure machine 2',  coef: 2, cred: 2, tdW: 0,  tpW: .4, examW: .6),
-    _ModuleCfg(name: 'Proba & Stat Descr.',  coef: 3, cred: 3, tdW: .3, tpW: 0,   examW: .7),
-    _ModuleCfg(name: 'TIC',                  coef: 1, cred: 2, tdW: 0,  tpW: 0,   examW: 1),
-    _ModuleCfg(name: 'Outils Prog. Maths',   coef: 1, cred: 2, tdW: 0,  tpW: .4, examW: .6),
-    _ModuleCfg(name: 'Physique 2',           coef: 3, cred: 3, tdW: .3, tpW: 0,   examW: .7),
-    _ModuleCfg(name: 'Unité Découverte',     coef: 2, cred: 2, tdW: 0,  tpW: 0,   examW: 1),
-  ]);
-}
-
-class _SemesterTableCalculatorScreenState
-    extends State<SemesterTableCalculatorScreen> with TickerProviderStateMixin {
-  late final TabController _tab;
-  late _SemesterCfg s1;
-  late _SemesterCfg s2;
-
-  @override
-  void initState() {
-    super.initState();
-    s1 = _buildS1();
-    s2 = _buildS2();
-    _tab = TabController(length: 2, vsync: this, initialIndex: 0);
-  }
-
-  @override
-  void dispose() {
-    _tab.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('L1MI • ${widget.title}'),
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu),
-            onPressed: () => Scaffold.of(ctx).openEndDrawer(),
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_forward),
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tab,
-          tabs: const [
-            Tab(text: 'SEMESTER 1'),
-            Tab(text: 'SEMESTER 2'),
-          ],
-        ),
-      ),
-      endDrawer: const AppEndDrawer(),
-      body: TabBarView(
-        controller: _tab,
-        children: [
-          _SemesterView(sem: s1, other: s2, tab: _tab),
-          _SemesterView(sem: s2, other: s1, tab: _tab),
-        ],
-      ),
-    );
-  }
-}
-
-// واجهة فصل واحد + الخلاصة السفلية
-class _SemesterView extends StatefulWidget {
-  final _SemesterCfg sem;
-  final _SemesterCfg other; // للفصل الآخر لحساب السنة
-  final TabController tab;
-  const _SemesterView({required this.sem, required this.other, required this.tab});
-
-  @override
-  State<_SemesterView> createState() => _SemesterViewState();
-}
-
-class _SemesterViewState extends State<_SemesterView> {
-  @override
-  Widget build(BuildContext context) {
-    final sem = widget.sem;
-    final other = widget.other;
-
-    final sAvg = sem.avg;
-    final oAvg = other.avg;
-
-    final yearAvg = (sAvg + oAvg) / 2;
-    final yearCred = sem.creditsValidated + other.creditsValidated;
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-      children: [
-        // عنوان الفصل (مطابق للصورة)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-          child: Text(
-            sem.name,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-          ),
-        ),
-
-        // رأس الجدول
-        _headerRow(),
-
-        const SizedBox(height: 8),
-
-        // كل موديول في بطاقة تشبه صف الجدول
-        ...sem.modules.map((m) => _moduleCard(m)).toList(),
-
-        const SizedBox(height: 14),
-
-        // الخلاصة السفليّة
-        _summaryCard(
-          sem,
-          other,
-          sAvg: sAvg,
-          oAvg: oAvg,
-          yearAvg: yearAvg,
-          yearCred: yearCred,
-        ),
-      ],
-    );
-  }
-
-  Widget _headerRow() {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-        child: Row(
-          children: const [
-            Expanded(flex: 5, child: Text('Modules', style: TextStyle(fontWeight: FontWeight.bold))),
-            SizedBox(width: 10),
-            SizedBox(width: 40, child: Text('Coef', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-            SizedBox(width: 50, child: Text('Cred', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-            SizedBox(width: 120, child: Text('Moyenne module', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _moduleCard(_ModuleCfg m) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-        child: Column(
-          children: [
-            // السطر العلوي (اسم، coef، cred، moyenne)
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(flex: 5, child: Text(m.name, style: const TextStyle(fontWeight: FontWeight.w600))),
-                const SizedBox(width: 10),
-                SizedBox(width: 40, child: Text('${m.coef}', textAlign: TextAlign.center)),
-                SizedBox(width: 50, child: Text('${m.cred}', textAlign: TextAlign.center)),
-                SizedBox(
-                  width: 120,
-                  child: Text(
-                    m.moyenne.toStringAsFixed(2),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            const Divider(height: 1),
-
-            // أسطر TD/TP/EXAM مع النِّسَب وحقول إدخال العلامات
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Column(
-                children: [
-                  _componentLine(
-                    label: 'TD',
-                    weightPct: (m.tdW * 100).round(),
-                    value: m.td,
-                    onChanged: (v) => setState(() => m.td = v),
-                  ),
-                  if (m.tpW > 0)
-                    _componentLine(
-                      label: 'TP',
-                      weightPct: (m.tpW * 100).round(),
-                      value: m.tp,
-                      onChanged: (v) => setState(() => m.tp = v),
-                    ),
-                  _componentLine(
-                    label: 'EXAM',
-                    weightPct: (m.examW * 100).round(),
-                    value: m.exam,
-                    onChanged: (v) => setState(() => m.exam = v),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _componentLine({
-    required String label,
-    required int weightPct,
-    required double value,
-    required ValueChanged<double> onChanged,
-  }) {
-    return Row(
-      children: [
-        // % في اليسار
-        SizedBox(
-          width: 60,
-          child: Text(
-            '$weightPct%',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey.shade700, fontWeight: FontWeight.w600),
-          ),
-        ),
-        const SizedBox(width: 6),
-        // اسم المكوّن
-        SizedBox(width: 60, child: Text(label)),
-        const Spacer(),
-        // حقل علامة 0..20
-        SizedBox(
-          width: 80,
-          child: TextField(
-            textAlign: TextAlign.center,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              isDense: true,
-              hintText: '0..20',
-              border: OutlineInputBorder(),
-            ),
-            controller: TextEditingController(text: value == 0 ? '' : value.toString()),
-            onSubmitted: (t) {
-              final v = double.tryParse(t.replaceAll(',', '.')) ?? 0;
-              final clamped = v.clamp(0, 20);
-              onChanged(clamped.toDouble());
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _summaryCard(
-    _SemesterCfg sem,
-    _SemesterCfg other, {
-    required double sAvg,
-    required double oAvg,
-    required double yearAvg,
-    required int yearCred,
-  }) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          children: [
-            // رأس صغير
-            Row(
-              children: const [
-                Expanded(
-                  child: Text(
-                    'Semestre/année',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                SizedBox(width: 100, child: Text('Moyenne', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-                SizedBox(width: 80, child: Text('Crédits', textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold))),
-              ],
-            ),
-            const Divider(),
-            _summaryRow(
-              'semestre1',
-              (widget.tab.index == 0 ? sAvg : oAvg).toStringAsFixed(2),
-              (widget.tab.index == 0 ? sem.creditsValidated : other.creditsValidated).toString(),
-            ),
-            _summaryRow(
-              'semestre2',
-              (widget.tab.index == 1 ? sAvg : oAvg).toStringAsFixed(2),
-              (widget.tab.index == 1 ? sem.creditsValidated : other.creditsValidated).toString(),
-            ),
-            const Divider(),
-            _summaryRow('Année', yearAvg.toStringAsFixed(2), yearCred.toString()),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _summaryRow(String a, String b, String c) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          Expanded(child: Text(a, style: const TextStyle(fontWeight: FontWeight.w600))),
-          const SizedBox(width: 100, child: SizedBox()),
-          SizedBox(
-            width: 100,
-            child: Text(b, textAlign: TextAlign.center),
-          ),
-          SizedBox(
-            width: 80,
-            child: Text(c, textAlign: TextAlign.center),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ============================================================================
-// الحاسبة العامة (واجهة بسيطة مؤقتة)
-// ============================================================================
-class CalculatorScreen extends StatelessWidget {
-  const CalculatorScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return BaseScaffold(
-      title: 'حاسبة المعدل',
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.calculate_outlined, size: 64, color: kFachubBlue),
-              const SizedBox(height: 12),
-              const Text(
-                'هذه نسخة مبسطة — انتقل إلى "الدراسة" لاستخدام جدول الفصول المفصّل.',
+              Text(
+                subtitle!,
                 textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => FacultiesScreen(faculties: demoFaculties),
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.menu_book_outlined),
-                label: const Text('فتح مسار الدراسة'),
+                style: const TextStyle(color: Colors.black54),
               ),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 }
-
-// ============================================================================
-// عناصر مساعدة عامة (قد تكون معرفة سابقًا)
-// ============================================================================
-
-
-
-// ============================================================================
-// نهاية الملف ✅
-// ============================================================================
