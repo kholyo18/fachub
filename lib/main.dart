@@ -1386,11 +1386,24 @@ class CalculatorHubScreen extends StatelessWidget {
               title: const Text('جدول مفصّل (S1/S2) مثل الصورة'),
               subtitle: const Text('مكوّنات TD/TP/EXAM وحساب آلي'),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => const SemesterTableCalculatorScreen()),
-              ),
+              onTap: () {
+                final track = demoFaculties.first.majors.first.tracks.first;
+                final specs = createSemesterSpecsForTrack(track);
+                final sem1 = _pickSemester(specs, 'S1');
+                final sem2 = _pickSemester(specs, 'S2');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => StudiesTableScreen(
+                      facultyName: demoFaculties.first.name,
+                      programName:
+                          '${demoFaculties.first.majors.first.name} • ${track.name}',
+                      semester1Modules: sem1,
+                      semester2Modules: sem2,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -1669,6 +1682,98 @@ final demoFaculties = <ProgramFaculty>[
   ),
 ];
 
+// ===================== GPA Table Data Model (public) ========================
+class EvalWeight {
+  final String label;
+  final double weight;
+  const EvalWeight({required this.label, required this.weight});
+}
+
+class ModuleSpec {
+  final String name;
+  final double coef;
+  final double credits;
+  final List<EvalWeight> evalWeights;
+  const ModuleSpec({
+    required this.name,
+    required this.coef,
+    required this.credits,
+    required this.evalWeights,
+  });
+
+  double get totalWeight =>
+      evalWeights.fold<double>(0, (sum, item) => sum + item.weight);
+}
+
+class SemesterSpec {
+  final String name;
+  final List<ModuleSpec> modules;
+  const SemesterSpec({required this.name, required this.modules});
+}
+
+List<SemesterSpec> createSemesterSpecsForTrack(ProgramTrack track) {
+  return track.semesters
+      .map(
+        (sem) => SemesterSpec(
+          name: sem.label,
+          modules: sem.modules
+              .map(
+                (module) => ModuleSpec(
+                  name: module.name,
+                  coef: module.coef.toDouble(),
+                  credits: module.credits.toDouble(),
+                  evalWeights: _normalizeEvalWeights(module.components),
+                ),
+              )
+              .toList(growable: false),
+        ),
+      )
+      .toList(growable: false);
+}
+
+List<SemesterSpec> demoL1GpaSpecs() {
+  final track = demoFaculties.first.majors.first.tracks.first;
+  return createSemesterSpecsForTrack(track);
+}
+
+List<EvalWeight> _normalizeEvalWeights(List<ProgramComponent> components) {
+  final Map<String, double> weights = {
+    'TD': 0,
+    'TP': 0,
+    'EXAM': 0,
+  };
+  for (final c in components) {
+    final key = c.label.toUpperCase();
+    if (weights.containsKey(key)) {
+      weights[key] = c.weight;
+    }
+  }
+  return [
+    EvalWeight(label: 'TD', weight: weights['TD']!),
+    EvalWeight(label: 'TP', weight: weights['TP']!),
+    EvalWeight(label: 'EXAM', weight: weights['EXAM']!),
+  ];
+}
+
+SemesterSpec _pickSemester(List<SemesterSpec> specs, String label) {
+  final normalizedLabel = label.toUpperCase();
+  if (specs.isEmpty) {
+    return const SemesterSpec(name: 'S?', modules: []);
+  }
+  return specs.firstWhere(
+    (s) => s.name.toUpperCase() == normalizedLabel,
+    orElse: () {
+      if (normalizedLabel == 'S1') {
+        return specs.first;
+      }
+      if (normalizedLabel == 'S2' && specs.length > 1) {
+        return specs.last;
+      }
+      return specs.first;
+    },
+  );
+}
+
 // ================================ UI: Faculties ==============================
 class FacultiesScreen extends StatelessWidget {
   final List<ProgramFaculty> faculties;
@@ -1730,7 +1835,12 @@ class FacultyMajorsScreen extends StatelessWidget {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => MajorTracksScreen(major: m)),
+                MaterialPageRoute(
+                  builder: (_) => MajorTracksScreen(
+                    major: m,
+                    faculty: faculty,
+                  ),
+                ),
               );
             },
           );
@@ -1743,7 +1853,8 @@ class FacultyMajorsScreen extends StatelessWidget {
 // =============================== UI: Tracks =================================
 class MajorTracksScreen extends StatelessWidget {
   final ProgramMajor major;
-  const MajorTracksScreen({super.key, required this.major});
+  final ProgramFaculty faculty;
+  const MajorTracksScreen({super.key, required this.major, required this.faculty});
 
   @override
   Widget build(BuildContext context) {
@@ -1761,10 +1872,18 @@ class MajorTracksScreen extends StatelessWidget {
             subtitle: const Text('S1 + S2'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
+              final specs = createSemesterSpecsForTrack(t);
+              final sem1 = _pickSemester(specs, 'S1');
+              final sem2 = _pickSemester(specs, 'S2');
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => SemesterTableCalculatorScreen(track: t),
+                  builder: (_) => StudiesTableScreen(
+                    facultyName: faculty.name,
+                    programName: '${major.name} • ${t.name}',
+                    semester1Modules: sem1,
+                    semester2Modules: sem2,
+                  ),
                 ),
               );
             },
@@ -1775,277 +1894,469 @@ class MajorTracksScreen extends StatelessWidget {
   }
 }
 
-// ========================== UI: Table Calculator =============================
-class SemesterTableCalculatorScreen extends StatefulWidget {
-  final ProgramTrack? track; // اختياري عند الدخول من الهب
-  const SemesterTableCalculatorScreen({super.key, this.track});
+// ========================== UI: Studies GPA Table ============================
+class StudiesTableScreen extends StatefulWidget {
+  final String facultyName;
+  final String programName;
+  final SemesterSpec semester1Modules;
+  final SemesterSpec semester2Modules;
+
+  const StudiesTableScreen({
+    super.key,
+    required this.facultyName,
+    required this.programName,
+    required this.semester1Modules,
+    required this.semester2Modules,
+  });
 
   @override
-  State<SemesterTableCalculatorScreen> createState() =>
-      _SemesterTableCalculatorScreenState();
+  State<StudiesTableScreen> createState() => _StudiesTableScreenState();
 }
 
-class _SemesterTableCalculatorScreenState
-    extends State<SemesterTableCalculatorScreen>
+class _StudiesTableScreenState extends State<StudiesTableScreen>
     with SingleTickerProviderStateMixin {
-  late final ProgramTrack _track;
-  late final TabController _tab;
-  final Map<String, TextEditingController> _inputs = {};
+  late final TabController _tabController;
+  final Map<String, TextEditingController> _controllers = {};
 
   @override
   void initState() {
     super.initState();
-    _track = widget.track ??
-        demoFaculties.first.majors.first.tracks.first; // افتراضي
-    _tab = TabController(length: _track.semesters.length, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
-    for (final c in _inputs.values) {
-      c.dispose();
+    for (final controller in _controllers.values) {
+      controller.dispose();
     }
-    _tab.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
-  TextEditingController _ctrl(String key) =>
-      _inputs.putIfAbsent(key, () => TextEditingController());
+  TextEditingController _controllerFor(String key) =>
+      _controllers.putIfAbsent(key, () => TextEditingController());
 
-  double _moduleAvg(ProgramModule m, String semKey, int mi) {
-    double sum = 0, w = 0;
-    for (final c in m.components) {
-      final key = '$semKey|$mi|${c.label}';
-      final v = double.tryParse(_ctrl(key).text) ?? 0;
-      sum += v * c.weight;
-      w += c.weight;
+  void _handleNoteChanged(String key, String rawValue) {
+    final normalized = rawValue.replaceAll(',', '.');
+    final parsed = double.tryParse(normalized);
+    if (parsed == null) {
+      setState(() {});
+      return;
     }
-    return w > 0 ? sum / w : 0;
-  }
-
-  double _semesterAvg(ProgramSemester sem, String semKey) {
-    double total = 0, coefs = 0;
-    for (int i = 0; i < sem.modules.length; i++) {
-      final m = sem.modules[i];
-      final avg = _moduleAvg(m, semKey, i);
-      total += avg * m.coef;
-      coefs += m.coef;
-    }
-    return coefs > 0 ? total / coefs : 0;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final semesters = _track.semesters;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('L1 • ${_track.name}'),
-        bottom: TabBar(
-          controller: _tab,
-          tabs: semesters.map((s) => Tab(text: s.label)).toList(),
-        ),
-      ),
-      endDrawer: const AppEndDrawer(),
-      body: TabBarView(
-        controller: _tab,
-        children: semesters.map((sem) {
-          final s1 = semesters.firstWhere((e) => e.label == 'S1',
-              orElse: () => sem);
-          final s2 = semesters.firstWhere((e) => e.label == 'S2',
-              orElse: () => sem);
-          final s1Avg = _semesterAvg(s1, 'S1');
-          final s2Avg = _semesterAvg(s2, 'S2');
-          final yearAvg = (s1Avg + s2Avg) / 2;
-
-          return ListView(
-            padding: const EdgeInsets.all(12),
-            children: [
-              _buildSemesterTable(sem),
-              const SizedBox(height: 10),
-              _yearSummaryCard(s1Avg: s1Avg, s2Avg: s2Avg, yearAvg: yearAvg),
-              const SizedBox(height: 20),
-            ],
+    final clamped = parsed.clamp(0, 20);
+    if (clamped != parsed) {
+      final controller = _controllerFor(key);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final doubleValue = (clamped as num).toDouble();
+        final formatted = _formatNumber(doubleValue);
+        controller
+          ..text = formatted
+          ..selection = TextSelection.fromPosition(
+            TextPosition(offset: formatted.length),
           );
-        }).toList(),
+      });
+    }
+    setState(() {});
+  }
+
+  double _readNote(String key) {
+    final normalized = _controllerFor(key).text.replaceAll(',', '.');
+    final parsed = double.tryParse(normalized);
+    if (parsed == null) {
+      return 0;
+    }
+    final clamped = parsed.clamp(0, 20);
+    return (clamped as num).toDouble();
+  }
+
+  double _moduleAverage(SemesterSpec semester, int moduleIndex) {
+    final module = semester.modules[moduleIndex];
+    double weighted = 0;
+    double weights = 0;
+    for (final weight in module.evalWeights) {
+      if (weight.weight <= 0) continue;
+      final key = _noteKey(semester.name, moduleIndex, weight.label);
+      final note = _readNote(key);
+      weighted += note * weight.weight;
+      weights += weight.weight;
+    }
+    if (weights == 0) {
+      return 0;
+    }
+    return weighted / weights;
+  }
+
+  double _moduleCredits(SemesterSpec semester, int moduleIndex) {
+    final module = semester.modules[moduleIndex];
+    final avg = _moduleAverage(semester, moduleIndex);
+    return (avg * module.credits) / 20.0;
+  }
+
+  double _semesterAverage(SemesterSpec semester) {
+    double total = 0;
+    double coefs = 0;
+    for (var i = 0; i < semester.modules.length; i++) {
+      final module = semester.modules[i];
+      final avg = _moduleAverage(semester, i);
+      total += avg * module.coef;
+      coefs += module.coef;
+    }
+    if (coefs == 0) {
+      return 0;
+    }
+    return total / coefs;
+  }
+
+  double _semesterCredits(SemesterSpec semester) {
+    double total = 0;
+    for (var i = 0; i < semester.modules.length; i++) {
+      total += _moduleCredits(semester, i);
+    }
+    return total;
+  }
+
+  String _noteKey(String semesterName, int moduleIndex, String label) =>
+      '$semesterName|$moduleIndex|$label';
+
+  String _formatNumber(double value) {
+    if (value.isNaN || value.isInfinite) {
+      return '0';
+    }
+    final rounded = double.parse(value.toStringAsFixed(4));
+    if ((rounded - rounded.truncateToDouble()).abs() < 1e-6) {
+      return rounded.toStringAsFixed(0);
+    }
+    return rounded.toStringAsFixed(2);
+  }
+
+  Widget _buildStickyHeader(BuildContext context) {
+    final theme = Theme.of(context);
+    final subtle = theme.textTheme.bodySmall?.color?.withOpacity(.7);
+    return Material(
+      elevation: 2,
+      color: theme.colorScheme.surface,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.programName,
+              style:
+                  theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              widget.facultyName,
+              style: theme.textTheme.bodyMedium?.copyWith(color: subtle),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // جدول مطابق للصورة: رأس صغير، خطوط واضحة، خلايا إدخال مرتبة
-  Widget _buildSemesterTable(ProgramSemester sem) {
+  Widget _buildSummaryFooter(
+    BuildContext context,
+    double s1Avg,
+    double s2Avg,
+    double yearAvg,
+    double totalCredits,
+  ) {
+    final theme = Theme.of(context);
+    final labelStyle =
+        theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
+    final valueStyle =
+        theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold);
+    return Material(
+      elevation: 4,
+      color: theme.colorScheme.surface,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'Résumé annuel',
+                style:
+                    theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              _summaryRow('Moyenne Semester 1', s1Avg, labelStyle, valueStyle),
+              const SizedBox(height: 6),
+              _summaryRow('Moyenne Semester 2', s2Avg, labelStyle, valueStyle),
+              const Divider(height: 20),
+              _summaryRow('Année', yearAvg, labelStyle, valueStyle),
+              const SizedBox(height: 6),
+              _summaryRow('Total Credits', totalCredits, labelStyle, valueStyle),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _summaryRow(
+    String label,
+    double value,
+    TextStyle? labelStyle,
+    TextStyle? valueStyle,
+  ) {
+    return Row(
+      children: [
+        Expanded(child: Text(label, style: labelStyle)),
+        Text(_formatNumber(value), style: valueStyle),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sem1 = widget.semester1Modules;
+    final sem2 = widget.semester2Modules;
+    final s1Avg = _semesterAverage(sem1);
+    final s2Avg = _semesterAverage(sem2);
+    final yearAvg = (s1Avg + s2Avg) / 2;
+    final totalCredits = _semesterCredits(sem1) + _semesterCredits(sem2);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.facultyName),
+      ),
+      endDrawer: const AppEndDrawer(),
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildStickyHeader(context),
+            Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: TabBar(
+                controller: _tabController,
+                tabs: const [
+                  Tab(text: 'S1'),
+                  Tab(text: 'S2'),
+                ],
+              ),
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: _GpaTable(
+                      semester: sem1,
+                      controllerFor: _controllerFor,
+                      onNoteChanged: _handleNoteChanged,
+                      moduleAverage: (index) => _moduleAverage(sem1, index),
+                      moduleCredits: (index) => _moduleCredits(sem1, index),
+                      formatNumber: _formatNumber,
+                      noteKey: (index, label) =>
+                          _noteKey(sem1.name, index, label),
+                    ),
+                  ),
+                  SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: _GpaTable(
+                      semester: sem2,
+                      controllerFor: _controllerFor,
+                      onNoteChanged: _handleNoteChanged,
+                      moduleAverage: (index) => _moduleAverage(sem2, index),
+                      moduleCredits: (index) => _moduleCredits(sem2, index),
+                      formatNumber: _formatNumber,
+                      noteKey: (index, label) =>
+                          _noteKey(sem2.name, index, label),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _buildSummaryFooter(context, s1Avg, s2Avg, yearAvg, totalCredits),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GpaTable extends StatelessWidget {
+  const _GpaTable({
+    required this.semester,
+    required this.controllerFor,
+    required this.onNoteChanged,
+    required this.moduleAverage,
+    required this.moduleCredits,
+    required this.formatNumber,
+    required this.noteKey,
+  });
+
+  final SemesterSpec semester;
+  final TextEditingController Function(String key) controllerFor;
+  final void Function(String key, String value) onNoteChanged;
+  final double Function(int moduleIndex) moduleAverage;
+  final double Function(int moduleIndex) moduleCredits;
+  final String Function(double value) formatNumber;
+  final String Function(int moduleIndex, String label) noteKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (semester.modules.isEmpty) {
+      return Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Center(
+            child: Text(
+              'لا توجد مواد لهذا السداسي.',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      clipBehavior: Clip.hardEdge,
+      child: Column(
+        children: [
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(.6),
-            child: const Row(
+            width: double.infinity,
+            color: theme.colorScheme.surfaceVariant.withOpacity(.6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            child: Row(
               children: [
-                _HeadCell('Modules', flex: 5),
-                _HeadCell('Coef'),
-                _HeadCell('Créd'),
-                _HeadCell('Note (TD/TP/EXAM)'),
-                _HeadCell('Moy.Module'),
-                _HeadCell('Créd.Mod'),
+                _headerCell('Module', flex: 5),
+                _headerCell('Coef', flex: 1),
+                _headerCell('Cred', flex: 1),
+                _headerCell('Notes TD / TP / EXAM', flex: 5),
+                _headerCell('Moyenne module', flex: 1),
+                _headerCell('Cred Mod', flex: 1),
               ],
             ),
           ),
           const Divider(height: 1),
-          // صفوف الموديلات والمكوّنات
-          ...List.generate(sem.modules.length, (i) {
-            final m = sem.modules[i];
-            final semKey = sem.label;
-            final avg = _moduleAvg(m, semKey, i);
-            return Column(children: [
-              // صف الموديل
-              _RowBordered(children: [
-                _Cell(Text(m.name), flex: 5),
-                _Cell(Text(m.coef.toString())),
-                _Cell(Text(m.credits.toString())),
-                const _Cell(Text('')),
-                _Cell(Text(avg.toStringAsFixed(2))),
-                _Cell(Text(m.credits.toString())),
-              ]),
-              // صفوف المكوّنات
-              ...m.components.map((c) {
-                final key = '$semKey|$i|${c.label}';
-                final controller = _ctrl(key);
-                return _RowBordered(children: [
-                  const _Cell(Text(''), flex: 5),
-                  const _Cell(Text('')),
-                  const _Cell(Text('')),
-                  _Cell(
-                    Row(children: [
-                      SizedBox(
-                        width: 42,
-                        child: Text(c.label,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.w700)),
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 76,
-                        child: TextField(
-                          controller: controller,
-                          keyboardType:
-                              const TextInputType.numberWithOptions(decimal: true),
-                          decoration: const InputDecoration(
-                            isDense: true,
-                            hintText: '0',
-                            contentPadding:
-                                EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                            border: OutlineInputBorder(),
-                          ),
-                          onChanged: (_) => setState(() {}),
+          ...List.generate(semester.modules.length, (index) {
+            final module = semester.modules[index];
+            final avg = moduleAverage(index);
+            final credits = moduleCredits(index);
+            return Column(
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: Text(
+                          module.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text('${c.weight.toStringAsFixed(0)}%'),
-                    ]),
+                      _valueCell(formatNumber(module.coef), flex: 1),
+                      _valueCell(formatNumber(module.credits), flex: 1),
+                      Expanded(
+                        flex: 5,
+                        child: Row(
+                          children:
+                              _buildNoteColumns(context, module, index),
+                        ),
+                      ),
+                      _valueCell(formatNumber(avg), flex: 1),
+                      _valueCell(formatNumber(credits), flex: 1),
+                    ],
                   ),
-                  const _Cell(Text('')),
-                  const _Cell(Text('')),
-                ]);
-              }),
-            ]);
+                ),
+                const Divider(height: 1),
+              ],
+            );
           }),
-        ]),
+        ],
       ),
     );
   }
 
-  Widget _yearSummaryCard({
-    required double s1Avg,
-    required double s2Avg,
-    required double yearAvg,
-  }) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(children: [
-          _sumHeader(),
-          const Divider(),
-          _sumRow('semestre1', s1Avg, 0),
-          _sumRow('semestre2', s2Avg, 0),
-          const Divider(),
-          _sumRow('Année', yearAvg, 0),
-        ]),
-      ),
-    );
-  }
-
-  Widget _sumHeader() => const Row(
-        children: [
-          Expanded(
-              child: Text('SEMESTRE/ANNÉE',
-                  style: TextStyle(fontWeight: FontWeight.w800))),
-          SizedBox(width: 110, child: Center(child: Text('Moyenne'))),
-          SizedBox(width: 110, child: Center(child: Text('Crédits'))),
-        ],
-      );
-
-  Widget _sumRow(String a, double moy, int cred) => Row(
-        children: [
-          Expanded(child: Text(a, style: const TextStyle(fontWeight: FontWeight.w700))),
-          SizedBox(
-              width: 110,
-              child: Center(child: Text(moy.toStringAsFixed(2)))),
-          SizedBox(width: 110, child: Center(child: Text(cred.toString()))),
-        ],
-      );
-}
-
-// خلايا رأس/صفوف بحدود واضحة (يشبه الجدول في الصورة)
-class _HeadCell extends StatelessWidget {
-  final String text;
-  final int flex;
-  const _HeadCell(this.text, {this.flex = 2});
-  @override
-  Widget build(BuildContext context) {
+  Widget _headerCell(String text, {int flex = 2}) {
     return Expanded(
       flex: flex,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: Text(text,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-      ),
-    );
-  }
-}
-
-class _RowBordered extends StatelessWidget {
-  final List<Widget> children;
-  const _RowBordered({required this.children});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom:
-              BorderSide(color: Theme.of(context).dividerColor.withOpacity(.6)),
+        child: Text(
+          text,
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(children: children),
     );
   }
-}
 
-class _Cell extends StatelessWidget {
-  final Widget child;
-  final int flex;
-  const _Cell(this.child, {this.flex = 2});
-  @override
-  Widget build(BuildContext context) {
+  Widget _valueCell(String text, {int flex = 2}) {
     return Expanded(
       flex: flex,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: child,
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
       ),
     );
+  }
+
+  List<Widget> _buildNoteColumns(
+      BuildContext context, ModuleSpec module, int moduleIndex) {
+    return module.evalWeights.map((weight) {
+      final fieldKey = noteKey(moduleIndex, weight.label);
+      final enabled = weight.weight > 0;
+      return Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                weight.label,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 44,
+                child: TextField(
+                  controller: controllerFor(fieldKey),
+                  enabled: enabled,
+                  textAlign: TextAlign.center,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    LengthLimitingTextInputFormatter(5),
+                  ],
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: enabled ? '0' : '—',
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 10),
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (value) => onNoteChanged(fieldKey, value),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${formatNumber(weight.weight)}%',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+        ),
+      );
+    }).toList(growable: false);
   }
 }
 // ============================================================================
