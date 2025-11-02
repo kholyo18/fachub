@@ -162,7 +162,7 @@ class _FachubAppState extends State<FachubApp> {
           brightness == Brightness.dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
     );
 
-    final cardTheme = CardTheme(
+    final cardTheme = CardThemeData(
       elevation: 2,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -231,7 +231,7 @@ class _FachubAppState extends State<FachubApp> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     );
 
-    final bottomAppBarTheme = BottomAppBarTheme(
+    final bottomAppBarTheme = BottomAppBarThemeData(
       color: scheme.surface,
       elevation: 4,
       shape: const CircularNotchedRectangle(),
