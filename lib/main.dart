@@ -2004,25 +2004,45 @@ List<EvalWeight> _normalizeEvalWeights(List<ProgramComponent> components) {
 class ModuleModel {
   ModuleModel({
     required this.title,
-    required this.coef,
-    required this.credits,
-    required this.tdWeight,
-    required this.tpWeight,
-    required this.examWeight,
-  });
+    required num coef,
+    required num credits,
+    required double tdWeight,
+    required double tpWeight,
+    required double examWeight,
+  })  : coef = coef.toDouble(),
+        credits = credits.toDouble(),
+        _hasTD = tdWeight > 0,
+        _hasTP = tpWeight > 0,
+        wTD = tdWeight > 0 ? 0.3333 : 0.0,
+        wTP = tpWeight > 0 ? 0.0 : 0.0,
+        wEX = examWeight > 0 ? 0.6667 : 0.0;
 
   final String title;
-  final double coef;
-  final double credits;
-  final double tdWeight;
-  final double tpWeight;
-  final double examWeight;
+  double coef;
+  double credits;
+  final bool _hasTD;
+  final bool _hasTP;
+  double wTD;
+  double wTP;
+  double wEX;
   double? td;
   double? tp;
   double? exam;
 
-  bool get hasTD => tdWeight > 0;
-  bool get hasTP => tpWeight > 0;
+  bool get hasTD => _hasTD;
+  bool get hasTP => _hasTP;
+
+  double get moy {
+    final totalW = wTD + wTP + wEX;
+    if (totalW <= 0) {
+      return 0;
+    }
+    double normalize(double weight) => weight <= 0 ? 0 : weight / totalW;
+    final v = (td ?? 0) * normalize(wTD) +
+        (tp ?? 0) * normalize(wTP) +
+        (exam ?? 0) * normalize(wEX);
+    return double.parse(v.toStringAsFixed(2));
+  }
 }
 
 class SemesterModel {
@@ -2066,24 +2086,7 @@ class SemesterModel {
   void recompute() => _onChanged();
 
   double moduleAverage(ModuleModel module) {
-    double total = 0;
-    double weights = 0;
-
-    void accumulate(double? value, double weight) {
-      if (weight <= 0) return;
-      final v = value ?? 0;
-      total += v * weight;
-      weights += weight;
-    }
-
-    accumulate(module.td, module.tdWeight);
-    accumulate(module.tp, module.tpWeight);
-    accumulate(module.exam, module.examWeight);
-
-    if (weights == 0) {
-      return 0;
-    }
-    return total / weights;
+    return module.moy;
   }
 
   double moduleCreditsEarned(ModuleModel module) {
@@ -2101,7 +2104,8 @@ class SemesterModel {
     if (coefs == 0) {
       return 0;
     }
-    return weighted / coefs;
+    final value = weighted / coefs;
+    return double.parse(value.toStringAsFixed(2));
   }
 
   double creditsEarned() {
@@ -2110,35 +2114,69 @@ class SemesterModel {
 }
 
 // ---------- Table helpers ----------
+class DecimalSanitizer extends TextInputFormatter {
+  DecimalSanitizer({this.decimalPlaces = 2});
+
+  final int decimalPlaces;
+
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final sanitized = newValue.text.replaceAll(',', '.');
+    final pattern = decimalPlaces > 0
+        ? RegExp(r'^\d*([.]\d{0,' + decimalPlaces.toString() + r'})?$')
+        : RegExp(r'^\d*$');
+    if (sanitized.isEmpty || pattern.hasMatch(sanitized)) {
+      return newValue.copyWith(text: sanitized);
+    }
+    return oldValue;
+  }
+}
+
 class _NumField extends StatelessWidget {
+  const _NumField({
+    required this.value,
+    required this.onChanged,
+    this.width = 64,
+    this.decimalPlaces = 2,
+    this.inputRangePattern,
+  });
+
   final double? value;
   final ValueChanged<double?> onChanged;
-  const _NumField({required this.value, required this.onChanged});
+  final double width;
+  final int decimalPlaces;
+  final RegExp? inputRangePattern;
+
   @override
   Widget build(BuildContext context) {
+    final initial = value == null ? '' : value!.toStringAsFixed(decimalPlaces);
     return SizedBox(
-      width: 56,
+      width: width,
       child: TextFormField(
         textAlign: TextAlign.center,
-        initialValue: value == null
-            ? ''
-            : value!.toStringAsFixed(
-                value!.truncateToDouble() == value ? 0 : 2,
-              ),
+        initialValue: initial,
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         decoration: const InputDecoration(
           isDense: true,
           contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         ),
         inputFormatters: [
-          // allow 0..20 with optional decimals
-          FilteringTextInputFormatter.allow(
-            RegExp(r'^([0-1]?\d(\.\d{0,2})?|20(\.0{0,2})?)$'),
-          ),
+          DecimalSanitizer(decimalPlaces: decimalPlaces),
+          if (inputRangePattern != null)
+            FilteringTextInputFormatter.allow(inputRangePattern!),
         ],
-        onChanged: (s) => onChanged(
-          s.isEmpty ? null : double.tryParse(s.replaceAll(',', '.')),
-        ),
+        onChanged: (s) {
+          final sanitized = s.replaceAll(',', '.');
+          if (sanitized.isEmpty) {
+            onChanged(null);
+            return;
+          }
+          final parsed = double.tryParse(sanitized);
+          if (parsed == null) {
+            return;
+          }
+          onChanged(parsed);
+        },
       ),
     );
   }
@@ -2395,6 +2433,19 @@ class _StudiesTableScreenState extends State<StudiesTableScreen>
     super.dispose();
   }
 
+  Widget _buildSemesterTabContent(SemesterModel semester) {
+    return Builder(
+      builder: (context) {
+        final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+        const summaryPadding = 160.0;
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(0, 8, 0, summaryPadding + bottomInset),
+          child: buildSemesterTable(context, semester),
+        );
+      },
+    );
+  }
+
   Widget _buildStickyHeader(BuildContext context) {
     final theme = Theme.of(context);
     final subtle = theme.textTheme.bodySmall?.color?.withOpacity(.7);
@@ -2427,13 +2478,10 @@ class _StudiesTableScreenState extends State<StudiesTableScreen>
   Widget build(BuildContext context) {
     final sem1 = _semester1;
     final sem2 = _semester2;
-    final s1Avg = sem1.semesterAverage();
-    final s2Avg = sem2.semesterAverage();
-    final yearAvg = (s1Avg + s2Avg) / 2;
-    final totalCredits = sem1.creditsEarned() + sem2.creditsEarned();
     final canPop = Navigator.canPop(context);
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text(widget.facultyName),
@@ -2442,6 +2490,9 @@ class _StudiesTableScreenState extends State<StudiesTableScreen>
         actions: const [],
       ),
       endDrawer: const AppEndDrawer(),
+      bottomNavigationBar: SafeArea(
+        child: _AnnualSummaryCard(semester1: sem1, semester2: sem2),
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -2460,18 +2511,11 @@ class _StudiesTableScreenState extends State<StudiesTableScreen>
               child: TabBarView(
                 controller: _tabController,
                 children: [
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: buildSemesterTable(context, sem1),
-                  ),
-                  SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: buildSemesterTable(context, sem2),
-                  ),
+                  _buildSemesterTabContent(sem1),
+                  _buildSemesterTabContent(sem2),
                 ],
               ),
             ),
-            buildAnnualSummary(context, sem1, sem2),
           ],
         ),
       ),
@@ -2530,6 +2574,7 @@ Widget _buildWideTable(
           DataColumn(label: _cell('Coef', bold: true, center: true), numeric: true),
           DataColumn(label: _cell('Cred', bold: true, center: true), numeric: true),
           DataColumn(label: _cell('Notes (TD / TP / EXAM)', bold: true)),
+          DataColumn(label: _cell('Poids (TD / TP / EXAM)', bold: true)),
           DataColumn(label: _cell('Moyenne module', bold: true, center: true), numeric: true),
           DataColumn(label: _cell('Cred Mod', bold: true, center: true), numeric: true),
         ],
@@ -2544,8 +2589,64 @@ Widget _buildWideTable(
                     padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
                     child: _NumField(
                       value: m.td,
+                      width: 64,
+                      decimalPlaces: 2,
                       onChanged: (v) {
                         m.td = v;
+                        onRecompute();
+                      },
+                      inputRangePattern:
+                          RegExp(r'^(?:|[0-1]?\d(?:[.]\d{0,2})?|20(?:[.]0{0,2})?)$'),
+                    ),
+                  ),
+                if (m.hasTP)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
+                    child: _NumField(
+                      value: m.tp,
+                      width: 64,
+                      decimalPlaces: 2,
+                      onChanged: (v) {
+                        m.tp = v;
+                        onRecompute();
+                      },
+                      inputRangePattern:
+                          RegExp(r'^(?:|[0-1]?\d(?:[.]\d{0,2})?|20(?:[.]0{0,2})?)$'),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
+                  child: _NumField(
+                    value: m.exam,
+                    width: 64,
+                    decimalPlaces: 2,
+                    onChanged: (v) {
+                      m.exam = v;
+                      onRecompute();
+                    },
+                    inputRangePattern:
+                        RegExp(r'^(?:|[0-1]?\d(?:[.]\d{0,2})?|20(?:[.]0{0,2})?)$'),
+                  ),
+                ),
+              ],
+            ),
+          );
+
+          final weightCells = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (m.hasTD)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
+                    child: _NumField(
+                      value: m.wTD,
+                      width: 72,
+                      decimalPlaces: 4,
+                      onChanged: (v) {
+                        if (!m.hasTD) return;
+                        m.wTD = v ?? 0;
                         onRecompute();
                       },
                     ),
@@ -2554,9 +2655,12 @@ Widget _buildWideTable(
                   Padding(
                     padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
                     child: _NumField(
-                      value: m.tp,
+                      value: m.wTP,
+                      width: 72,
+                      decimalPlaces: 4,
                       onChanged: (v) {
-                        m.tp = v;
+                        if (!m.hasTP) return;
+                        m.wTP = v ?? 0;
                         onRecompute();
                       },
                     ),
@@ -2564,9 +2668,11 @@ Widget _buildWideTable(
                 Padding(
                   padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
                   child: _NumField(
-                    value: m.exam,
+                    value: m.wEX,
+                    width: 72,
+                    decimalPlaces: 4,
                     onChanged: (v) {
-                      m.exam = v;
+                      m.wEX = v ?? 0;
                       onRecompute();
                     },
                   ),
@@ -2581,16 +2687,37 @@ Widget _buildWideTable(
               DataCell(
                 Directionality(
                   textDirection: TextDirection.ltr,
-                  child: _cell('${m.coef}', center: true),
+                  child: _NumField(
+                    value: m.coef,
+                    width: 72,
+                    decimalPlaces: 2,
+                    onChanged: (v) {
+                      if (v != null) {
+                        m.coef = v;
+                        onRecompute();
+                      }
+                    },
+                  ),
                 ),
               ),
               DataCell(
                 Directionality(
                   textDirection: TextDirection.ltr,
-                  child: _cell('${m.credits}', center: true),
+                  child: _NumField(
+                    value: m.credits,
+                    width: 72,
+                    decimalPlaces: 2,
+                    onChanged: (v) {
+                      if (v != null) {
+                        m.credits = v;
+                        onRecompute();
+                      }
+                    },
+                  ),
                 ),
               ),
               DataCell(noteCells),
+              DataCell(weightCells),
               DataCell(
                 Directionality(
                   textDirection: TextDirection.ltr,
@@ -2600,7 +2727,7 @@ Widget _buildWideTable(
               DataCell(
                 Directionality(
                   textDirection: TextDirection.ltr,
-                  child: _cell(moduleCreditsEarned(m).toStringAsFixed(0), center: true),
+                  child: _cell(moduleCreditsEarned(m).toStringAsFixed(2), center: true),
                 ),
               ),
             ],
@@ -2669,12 +2796,30 @@ class _ModuleCard extends StatelessWidget {
             const SizedBox(width: 12),
             Directionality(
               textDirection: TextDirection.ltr,
-              child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _ModuleBadge(label: 'Coef ${_formatDouble(module.coef)}'),
-                  _ModuleBadge(label: 'Cred ${_formatDouble(module.credits)}'),
+                  _LabeledValueField(
+                    label: 'Coef',
+                    value: module.coef,
+                    onChanged: (v) {
+                      if (v != null) {
+                        module.coef = v;
+                        onRecompute();
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 12),
+                  _LabeledValueField(
+                    label: 'Cred',
+                    value: module.credits,
+                    onChanged: (v) {
+                      if (v != null) {
+                        module.credits = v;
+                        onRecompute();
+                      }
+                    },
+                  ),
                 ],
               ),
             ),
@@ -2727,6 +2872,46 @@ class _ModuleCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  Text('Poids (TD / TP / EXAM)', style: labelStyle),
+                  const SizedBox(height: 8),
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Row(
+                      children: [
+                        _WeightField(
+                          label: 'wTD',
+                          enabled: module.hasTD,
+                          value: module.wTD,
+                          padding: EdgeInsetsDirectional.zero,
+                          onChanged: (v) {
+                            if (!module.hasTD) return;
+                            module.wTD = v ?? 0;
+                            onRecompute();
+                          },
+                        ),
+                        _WeightField(
+                          label: 'wTP',
+                          enabled: module.hasTP,
+                          value: module.wTP,
+                          onChanged: (v) {
+                            if (!module.hasTP) return;
+                            module.wTP = v ?? 0;
+                            onRecompute();
+                          },
+                        ),
+                        _WeightField(
+                          label: 'wEX',
+                          enabled: true,
+                          value: module.wEX,
+                          onChanged: (v) {
+                            module.wEX = v ?? 0;
+                            onRecompute();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -2753,28 +2938,6 @@ class _ModuleCard extends StatelessWidget {
   }
 }
 
-class _ModuleBadge extends StatelessWidget {
-  const _ModuleBadge({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceVariant.withOpacity(.7),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Text(
-        label,
-        style: theme.textTheme.bodySmall,
-      ),
-    );
-  }
-}
-
 class _NoteField extends StatelessWidget {
   const _NoteField({
     required this.label,
@@ -2792,7 +2955,13 @@ class _NoteField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = _NumField(value: value, onChanged: onChanged);
+    final content = _NumField(
+      value: value,
+      onChanged: onChanged,
+      width: 64,
+      decimalPlaces: 2,
+      inputRangePattern: RegExp(r'^(?:|[0-1]?\d(?:[.]\d{0,2})?|20(?:[.]0{0,2})?)$'),
+    );
     final field = enabled
         ? content
         : IgnorePointer(child: Opacity(opacity: 0.35, child: content));
@@ -2811,58 +2980,134 @@ class _NoteField extends StatelessWidget {
   }
 }
 
-String _formatDouble(double value) {
-  if (value.truncateToDouble() == value) {
-    return value.toStringAsFixed(0);
+class _LabeledValueField extends StatelessWidget {
+  const _LabeledValueField({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final double value;
+  final ValueChanged<double?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.bodySmall),
+        const SizedBox(height: 4),
+        _NumField(
+          value: value,
+          width: 72,
+          decimalPlaces: 2,
+          onChanged: onChanged,
+        ),
+      ],
+    );
   }
-  return value.toStringAsFixed(2);
 }
 
-Widget buildAnnualSummary(BuildContext context, SemesterModel s1, SemesterModel s2) {
-  final moy1 = s1.semesterAverage();
-  final moy2 = s2.semesterAverage();
-  final ann = (moy1 + moy2) / 2;
-  final creds = s1.creditsEarned() + s2.creditsEarned();
+class _WeightField extends StatelessWidget {
+  const _WeightField({
+    required this.label,
+    required this.enabled,
+    required this.value,
+    required this.onChanged,
+    this.padding = const EdgeInsetsDirectional.only(start: 8),
+  });
 
-  Widget row(String label, String value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Directionality(
-              textDirection: TextDirection.ltr,
-              child: Text(value),
-            ),
-          ],
-        ),
-      );
+  final String label;
+  final bool enabled;
+  final double value;
+  final ValueChanged<double?> onChanged;
+  final EdgeInsetsGeometry padding;
 
-  return Card(
-    margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-    child: Padding(
-      padding: const EdgeInsets.all(16),
+  @override
+  Widget build(BuildContext context) {
+    final content = _NumField(
+      value: value,
+      width: 72,
+      decimalPlaces: 4,
+      onChanged: onChanged,
+    );
+    final field = enabled
+        ? content
+        : IgnorePointer(child: Opacity(opacity: 0.35, child: content));
+
+    return Padding(
+      padding: padding,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text('Résumé annuel', style: Theme.of(context).textTheme.titleMedium),
-          ),
-          const SizedBox(height: 8),
-          row('Moyenne Semester 1', moy1.toStringAsFixed(2)),
-          row('Moyenne Semester 2', moy2.toStringAsFixed(2)),
-          const Divider(height: 20),
-          row('Année', ann.toStringAsFixed(2)),
-          row('Total Credits', creds.toStringAsFixed(0)),
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 4),
+          field,
         ],
       ),
-    ),
-  );
+    );
+  }
+}
+
+class _AnnualSummaryCard extends StatelessWidget {
+  const _AnnualSummaryCard({
+    required this.semester1,
+    required this.semester2,
+  });
+
+  final SemesterModel semester1;
+  final SemesterModel semester2;
+
+  @override
+  Widget build(BuildContext context) {
+    final moy1 = semester1.semesterAverage();
+    final moy2 = semester2.semesterAverage();
+    final ann = double.parse(((moy1 + moy2) / 2).toStringAsFixed(2));
+    final creds = semester1.creditsEarned() + semester2.creditsEarned();
+
+    Widget row(String label, String value) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Directionality(
+                textDirection: TextDirection.ltr,
+                child: Text(value),
+              ),
+            ],
+          ),
+        );
+
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text('Résumé annuel', style: Theme.of(context).textTheme.titleMedium),
+            ),
+            const SizedBox(height: 8),
+            row('Moyenne Semester 1', moy1.toStringAsFixed(2)),
+            row('Moyenne Semester 2', moy2.toStringAsFixed(2)),
+            const Divider(height: 20),
+            row('Année', ann.toStringAsFixed(2)),
+            row('Total Credits', creds.toStringAsFixed(2)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 // ============================================================================
 // PART 3/3 — Helpers, Colors, Studies helpers, Compatibility adapters
