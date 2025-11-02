@@ -166,10 +166,12 @@ class _FachubAppState extends State<FachubApp> {
             ? SystemUiOverlayStyle.light
             : SystemUiOverlayStyle.dark,
       ),
-      cardTheme: CardTheme(
+      cardTheme: const CardTheme(
         elevation: 2,
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: roundedShape,
+        margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(18)),
+        ),
         clipBehavior: Clip.antiAlias,
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -222,7 +224,8 @@ class _FachubAppState extends State<FachubApp> {
       ),
       bottomAppBarTheme: BottomAppBarTheme(
         color: scheme.surface,
-        elevation: 2,
+        elevation: 4,
+        shape: const CircularNotchedRectangle(),
         surfaceTintColor: scheme.surfaceTint,
         padding: const EdgeInsets.symmetric(horizontal: 12),
       ),
