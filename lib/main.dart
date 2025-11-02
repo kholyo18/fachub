@@ -116,18 +116,18 @@ class _FachubAppState extends State<FachubApp> {
   }
 
   ThemeData _buildTheme(Brightness brightness) {
+    final isLight = brightness == Brightness.light;
     final scheme = ColorScheme.fromSeed(
       seedColor: kFachubBlue,
-      primary: kFachubBlue,
-      secondary: kFachubTeal,
       brightness: brightness,
     ).copyWith(
-      surfaceVariant: brightness == Brightness.light
-          ? const Color(0xFFE3E6F0)
-          : const Color(0xFF2E3140),
-      outlineVariant: brightness == Brightness.light
-          ? const Color(0xFFCACED8)
-          : const Color(0xFF414458),
+      primary: kFachubBlue,
+      secondary: kFachubTeal,
+      surface: isLight ? const Color(0xFFF6F7FB) : const Color(0xFF171A24),
+      background: isLight ? const Color(0xFFF1F2F6) : const Color(0xFF11131B),
+      surfaceVariant: isLight ? const Color(0xFFE3E6F0) : const Color(0xFF2B2F3E),
+      outlineVariant: isLight ? const Color(0xFFCACED8) : const Color(0xFF414458),
+      onSurfaceVariant: isLight ? const Color(0xFF505468) : const Color(0xFFCED1E0),
     );
 
     final base = ThemeData(
@@ -140,15 +140,15 @@ class _FachubAppState extends State<FachubApp> {
     final textTheme = base.textTheme.copyWith(
       displaySmall: base.textTheme.displaySmall?.copyWith(fontSize: 44),
       headlineSmall:
-          base.textTheme.headlineSmall?.copyWith(fontSize: 26, fontWeight: FontWeight.w600),
+          base.textTheme.headlineSmall?.copyWith(fontSize: 28, fontWeight: FontWeight.w600),
       titleLarge:
-          base.textTheme.titleLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.w700),
+          base.textTheme.titleLarge?.copyWith(fontSize: 24, fontWeight: FontWeight.w700),
       titleMedium:
-          base.textTheme.titleMedium?.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
-      bodyLarge: base.textTheme.bodyLarge?.copyWith(height: 1.5),
-      bodyMedium: base.textTheme.bodyMedium?.copyWith(fontSize: 15, height: 1.5),
-      bodySmall: base.textTheme.bodySmall?.copyWith(height: 1.4),
-      labelLarge: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+          base.textTheme.titleMedium?.copyWith(fontSize: 20, fontWeight: FontWeight.w600),
+      bodyLarge: base.textTheme.bodyLarge?.copyWith(fontSize: 17, height: 1.55),
+      bodyMedium: base.textTheme.bodyMedium?.copyWith(fontSize: 16, height: 1.55),
+      bodySmall: base.textTheme.bodySmall?.copyWith(height: 1.45),
+      labelLarge: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600, letterSpacing: .2),
     );
 
     final roundedShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(18));
@@ -162,17 +162,15 @@ class _FachubAppState extends State<FachubApp> {
         foregroundColor: scheme.onSurface,
         elevation: 0,
         titleTextStyle: textTheme.titleLarge,
-        systemOverlayStyle: brightness == Brightness.dark
-            ? SystemUiOverlayStyle.light
-            : SystemUiOverlayStyle.dark,
+        systemOverlayStyle:
+            brightness == Brightness.dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       ),
-      cardTheme: const CardTheme(
+      cardTheme: CardTheme(
         elevation: 2,
-        margin: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(18)),
-        ),
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         clipBehavior: Clip.antiAlias,
+        surfaceTintColor: scheme.surfaceTint,
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -195,14 +193,22 @@ class _FachubAppState extends State<FachubApp> {
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           shape: roundedShape,
           textStyle: textTheme.labelLarge,
+        ).copyWith(
+          side: MaterialStateProperty.resolveWith(
+            (states) => BorderSide(
+              color: states.contains(MaterialState.disabled)
+                  ? scheme.outlineVariant.withOpacity(.4)
+                  : scheme.primary,
+            ),
+          ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: brightness == Brightness.light
-            ? scheme.surfaceVariant.withOpacity(.6)
-            : scheme.surfaceVariant.withOpacity(.4),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        fillColor: isLight
+            ? scheme.surfaceVariant.withOpacity(.65)
+            : scheme.surfaceVariant.withOpacity(.45),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
           borderSide: BorderSide(color: scheme.outlineVariant),
@@ -220,7 +226,7 @@ class _FachubAppState extends State<FachubApp> {
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
         elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       bottomAppBarTheme: BottomAppBarTheme(
         color: scheme.surface,
@@ -741,11 +747,15 @@ class _NoteFab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: FloatingActionButton(
-        elevation: 3,
-        onPressed: onTap,
-        child: const Icon(Icons.note_alt_outlined, size: 28),
+      padding: const EdgeInsets.only(bottom: 16),
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: FloatingActionButton(
+          elevation: 3,
+          onPressed: onTap,
+          child: const Icon(Icons.note_alt_outlined, size: 26),
+        ),
       ),
     );
   }
@@ -884,9 +894,11 @@ class HomeLandingScreen extends StatelessWidget {
     final canPop = Navigator.canPop(context);
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Fachub • الرئيسية'),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
+        actions: const [],
       ),
       endDrawer: const AppEndDrawer(),
       body: ListView(
@@ -1033,6 +1045,7 @@ class _NotesScreenState extends State<NotesScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('ملاحظاتي'),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
@@ -1255,6 +1268,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final canPop = Navigator.canPop(context);
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('مجتمع Fachub'),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
@@ -1570,6 +1584,7 @@ class CalculatorHubScreen extends StatelessWidget {
     final canPop = Navigator.canPop(context);
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('حاسبة المعدل'),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
@@ -1647,6 +1662,7 @@ class _QuickAverageScreenState extends State<QuickAverageScreen> {
     final canPop = Navigator.canPop(context);
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('حساب سريع'),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
@@ -2152,9 +2168,11 @@ class FacultiesScreen extends StatelessWidget {
     final canPop = Navigator.canPop(context);
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('الدراسة • الكليات'),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
+        actions: const [],
       ),
       endDrawer: const AppEndDrawer(),
       body: ListView.separated(
@@ -2218,9 +2236,11 @@ class FacultyMajorsScreen extends StatelessWidget {
     final canPop = Navigator.canPop(context);
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Text('الدراسة • ${faculty.name}'),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
+        actions: const [],
       ),
       endDrawer: const AppEndDrawer(),
       body: ListView.separated(
@@ -2261,9 +2281,11 @@ class MajorTracksScreen extends StatelessWidget {
     final canPop = Navigator.canPop(context);
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Text('الدراسة • ${major.name}'),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
+        actions: const [],
       ),
       endDrawer: const AppEndDrawer(),
       body: ListView.separated(
@@ -2397,9 +2419,11 @@ class _StudiesTableScreenState extends State<StudiesTableScreen>
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Text(widget.facultyName),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
+        actions: const [],
       ),
       endDrawer: const AppEndDrawer(),
       body: SafeArea(
