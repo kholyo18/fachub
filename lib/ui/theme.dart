@@ -37,7 +37,7 @@ class AppTheme {
       brightness: brightness,
       scaffoldBackgroundColor: scheme.background,
       textTheme: textTheme,
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         shape: roundedShape,
         elevation: brightness == Brightness.light ? 1 : 0,
         margin: EdgeInsets.zero,
@@ -88,12 +88,12 @@ class AppTheme {
           ),
         ),
       ),
-      bottomAppBarTheme: BottomAppBarTheme(
+      bottomAppBarTheme: BottomAppBarThemeData(
         elevation: brightness == Brightness.light ? 2 : 0,
         color: scheme.surface,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelStyle: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
         unselectedLabelStyle: textTheme.titleSmall,
         indicator: UnderlineTabIndicator(
