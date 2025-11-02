@@ -1755,6 +1755,160 @@ List<EvalWeight> _normalizeEvalWeights(List<ProgramComponent> components) {
   ];
 }
 
+class ModuleModel {
+  ModuleModel({
+    required this.title,
+    required this.coef,
+    required this.credits,
+    required this.tdWeight,
+    required this.tpWeight,
+    required this.examWeight,
+  });
+
+  final String title;
+  final double coef;
+  final double credits;
+  final double tdWeight;
+  final double tpWeight;
+  final double examWeight;
+  double? td;
+  double? tp;
+  double? exam;
+
+  bool get hasTD => tdWeight > 0;
+  bool get hasTP => tpWeight > 0;
+}
+
+class SemesterModel {
+  SemesterModel({
+    required this.name,
+    required this.modules,
+    required VoidCallback onChanged,
+  }) : _onChanged = onChanged;
+
+  factory SemesterModel.fromSpec(
+    SemesterSpec spec, {
+    required VoidCallback onChanged,
+  }) {
+    final modules = spec.modules.map((module) {
+      double weightFor(String label) {
+        return module.evalWeights
+            .firstWhere(
+              (w) => w.label.toUpperCase() == label,
+              orElse: () => const EvalWeight(label: 'TMP', weight: 0),
+            )
+            .weight;
+      }
+
+      return ModuleModel(
+        title: module.name,
+        coef: module.coef,
+        credits: module.credits,
+        tdWeight: weightFor('TD'),
+        tpWeight: weightFor('TP'),
+        examWeight: weightFor('EXAM'),
+      );
+    }).toList(growable: false);
+
+    return SemesterModel(name: spec.name, modules: modules, onChanged: onChanged);
+  }
+
+  final String name;
+  final List<ModuleModel> modules;
+  final VoidCallback _onChanged;
+
+  void recompute() => _onChanged();
+
+  double moduleAverage(ModuleModel module) {
+    double total = 0;
+    double weights = 0;
+
+    void accumulate(double? value, double weight) {
+      if (weight <= 0) return;
+      final v = value ?? 0;
+      total += v * weight;
+      weights += weight;
+    }
+
+    accumulate(module.td, module.tdWeight);
+    accumulate(module.tp, module.tpWeight);
+    accumulate(module.exam, module.examWeight);
+
+    if (weights == 0) {
+      return 0;
+    }
+    return total / weights;
+  }
+
+  double moduleCreditsEarned(ModuleModel module) {
+    final avg = moduleAverage(module);
+    return avg >= 10 ? module.credits : 0;
+  }
+
+  double semesterAverage() {
+    double weighted = 0;
+    double coefs = 0;
+    for (final module in modules) {
+      weighted += moduleAverage(module) * module.coef;
+      coefs += module.coef;
+    }
+    if (coefs == 0) {
+      return 0;
+    }
+    return weighted / coefs;
+  }
+
+  double creditsEarned() {
+    return modules.fold<double>(0, (sum, module) => sum + moduleCreditsEarned(module));
+  }
+}
+
+// ---------- Table helpers ----------
+class _NumField extends StatelessWidget {
+  final double? value;
+  final ValueChanged<double?> onChanged;
+  const _NumField({required this.value, required this.onChanged});
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 56,
+      child: TextFormField(
+        textAlign: TextAlign.center,
+        initialValue: value == null
+            ? ''
+            : value!.toStringAsFixed(
+                value!.truncateToDouble() == value ? 0 : 2,
+              ),
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          isDense: true,
+          contentPadding: EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        ),
+        inputFormatters: [
+          // allow 0..20 with optional decimals
+          FilteringTextInputFormatter.allow(
+            RegExp(r'^([0-1]?\d(\.\d{0,2})?|20(\.0{0,2})?)$'),
+          ),
+        ],
+        onChanged: (s) => onChanged(
+          s.isEmpty ? null : double.tryParse(s.replaceAll(',', '.')),
+        ),
+      ),
+    );
+  }
+}
+
+// Compact text widget that never wraps:
+Widget _cell(String s, {bool bold = false, bool center = false}) => Text(
+      s,
+      maxLines: 1,
+      softWrap: false,
+      overflow: TextOverflow.ellipsis,
+      textAlign: center ? TextAlign.center : TextAlign.start,
+      style: TextStyle(fontWeight: bold ? FontWeight.w600 : FontWeight.w400),
+    );
+// -----------------------------------
+
 SemesterSpec _pickSemester(List<SemesterSpec> specs, String label) {
   final normalizedLabel = label.toUpperCase();
   if (specs.isEmpty) {
@@ -1916,118 +2070,40 @@ class StudiesTableScreen extends StatefulWidget {
 class _StudiesTableScreenState extends State<StudiesTableScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
-  final Map<String, TextEditingController> _controllers = {};
+  late SemesterModel _semester1;
+  late SemesterModel _semester2;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _initSemesters();
+  }
+
+  void _initSemesters() {
+    _semester1 = SemesterModel.fromSpec(
+      widget.semester1Modules,
+      onChanged: () => setState(() {}),
+    );
+    _semester2 = SemesterModel.fromSpec(
+      widget.semester2Modules,
+      onChanged: () => setState(() {}),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant StudiesTableScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.semester1Modules != widget.semester1Modules ||
+        oldWidget.semester2Modules != widget.semester2Modules) {
+      _initSemesters();
+    }
   }
 
   @override
   void dispose() {
-    for (final controller in _controllers.values) {
-      controller.dispose();
-    }
     _tabController.dispose();
     super.dispose();
-  }
-
-  TextEditingController _controllerFor(String key) =>
-      _controllers.putIfAbsent(key, () => TextEditingController());
-
-  void _handleNoteChanged(String key, String rawValue) {
-    final normalized = rawValue.replaceAll(',', '.');
-    final parsed = double.tryParse(normalized);
-    if (parsed == null) {
-      setState(() {});
-      return;
-    }
-    final clamped = parsed.clamp(0, 20);
-    if (clamped != parsed) {
-      final controller = _controllerFor(key);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        final doubleValue = (clamped as num).toDouble();
-        final formatted = _formatNumber(doubleValue);
-        controller
-          ..text = formatted
-          ..selection = TextSelection.fromPosition(
-            TextPosition(offset: formatted.length),
-          );
-      });
-    }
-    setState(() {});
-  }
-
-  double _readNote(String key) {
-    final normalized = _controllerFor(key).text.replaceAll(',', '.');
-    final parsed = double.tryParse(normalized);
-    if (parsed == null) {
-      return 0;
-    }
-    final clamped = parsed.clamp(0, 20);
-    return (clamped as num).toDouble();
-  }
-
-  double _moduleAverage(SemesterSpec semester, int moduleIndex) {
-    final module = semester.modules[moduleIndex];
-    double weighted = 0;
-    double weights = 0;
-    for (final weight in module.evalWeights) {
-      if (weight.weight <= 0) continue;
-      final key = _noteKey(semester.name, moduleIndex, weight.label);
-      final note = _readNote(key);
-      weighted += note * weight.weight;
-      weights += weight.weight;
-    }
-    if (weights == 0) {
-      return 0;
-    }
-    return weighted / weights;
-  }
-
-  double _moduleCredits(SemesterSpec semester, int moduleIndex) {
-    final module = semester.modules[moduleIndex];
-    final avg = _moduleAverage(semester, moduleIndex);
-    return (avg * module.credits) / 20.0;
-  }
-
-  double _semesterAverage(SemesterSpec semester) {
-    double total = 0;
-    double coefs = 0;
-    for (var i = 0; i < semester.modules.length; i++) {
-      final module = semester.modules[i];
-      final avg = _moduleAverage(semester, i);
-      total += avg * module.coef;
-      coefs += module.coef;
-    }
-    if (coefs == 0) {
-      return 0;
-    }
-    return total / coefs;
-  }
-
-  double _semesterCredits(SemesterSpec semester) {
-    double total = 0;
-    for (var i = 0; i < semester.modules.length; i++) {
-      total += _moduleCredits(semester, i);
-    }
-    return total;
-  }
-
-  String _noteKey(String semesterName, int moduleIndex, String label) =>
-      '$semesterName|$moduleIndex|$label';
-
-  String _formatNumber(double value) {
-    if (value.isNaN || value.isInfinite) {
-      return '0';
-    }
-    final rounded = double.parse(value.toStringAsFixed(4));
-    if ((rounded - rounded.truncateToDouble()).abs() < 1e-6) {
-      return rounded.toStringAsFixed(0);
-    }
-    return rounded.toStringAsFixed(2);
   }
 
   Widget _buildStickyHeader(BuildContext context) {
@@ -2058,70 +2134,14 @@ class _StudiesTableScreenState extends State<StudiesTableScreen>
     );
   }
 
-  Widget _buildSummaryFooter(
-    BuildContext context,
-    double s1Avg,
-    double s2Avg,
-    double yearAvg,
-    double totalCredits,
-  ) {
-    final theme = Theme.of(context);
-    final labelStyle =
-        theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
-    final valueStyle =
-        theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold);
-    return Material(
-      elevation: 4,
-      color: theme.colorScheme.surface,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Résumé annuel',
-                style:
-                    theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              _summaryRow('Moyenne Semester 1', s1Avg, labelStyle, valueStyle),
-              const SizedBox(height: 6),
-              _summaryRow('Moyenne Semester 2', s2Avg, labelStyle, valueStyle),
-              const Divider(height: 20),
-              _summaryRow('Année', yearAvg, labelStyle, valueStyle),
-              const SizedBox(height: 6),
-              _summaryRow('Total Credits', totalCredits, labelStyle, valueStyle),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _summaryRow(
-    String label,
-    double value,
-    TextStyle? labelStyle,
-    TextStyle? valueStyle,
-  ) {
-    return Row(
-      children: [
-        Expanded(child: Text(label, style: labelStyle)),
-        Text(_formatNumber(value), style: valueStyle),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final sem1 = widget.semester1Modules;
-    final sem2 = widget.semester2Modules;
-    final s1Avg = _semesterAverage(sem1);
-    final s2Avg = _semesterAverage(sem2);
+    final sem1 = _semester1;
+    final sem2 = _semester2;
+    final s1Avg = sem1.semesterAverage();
+    final s2Avg = sem2.semesterAverage();
     final yearAvg = (s1Avg + s2Avg) / 2;
-    final totalCredits = _semesterCredits(sem1) + _semesterCredits(sem2);
+    final totalCredits = sem1.creditsEarned() + sem2.creditsEarned();
 
     return Scaffold(
       appBar: AppBar(
@@ -2147,35 +2167,17 @@ class _StudiesTableScreenState extends State<StudiesTableScreen>
                 controller: _tabController,
                 children: [
                   SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: _GpaTable(
-                      semester: sem1,
-                      controllerFor: _controllerFor,
-                      onNoteChanged: _handleNoteChanged,
-                      moduleAverage: (index) => _moduleAverage(sem1, index),
-                      moduleCredits: (index) => _moduleCredits(sem1, index),
-                      formatNumber: _formatNumber,
-                      noteKey: (index, label) =>
-                          _noteKey(sem1.name, index, label),
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: buildSemesterTable(context, sem1),
                   ),
                   SingleChildScrollView(
-                    padding: const EdgeInsets.all(16),
-                    child: _GpaTable(
-                      semester: sem2,
-                      controllerFor: _controllerFor,
-                      onNoteChanged: _handleNoteChanged,
-                      moduleAverage: (index) => _moduleAverage(sem2, index),
-                      moduleCredits: (index) => _moduleCredits(sem2, index),
-                      formatNumber: _formatNumber,
-                      noteKey: (index, label) =>
-                          _noteKey(sem2.name, index, label),
-                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: buildSemesterTable(context, sem2),
                   ),
                 ],
               ),
             ),
-            _buildSummaryFooter(context, s1Avg, s2Avg, yearAvg, totalCredits),
+            buildAnnualSummary(context, sem1, sem2),
           ],
         ),
       ),
@@ -2183,181 +2185,155 @@ class _StudiesTableScreenState extends State<StudiesTableScreen>
   }
 }
 
-class _GpaTable extends StatelessWidget {
-  const _GpaTable({
-    required this.semester,
-    required this.controllerFor,
-    required this.onNoteChanged,
-    required this.moduleAverage,
-    required this.moduleCredits,
-    required this.formatNumber,
-    required this.noteKey,
-  });
+Widget buildSemesterTable(BuildContext context, SemesterModel sem) {
+  return Card(
+    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    child: Directionality(
+      textDirection: TextDirection.rtl,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minWidth: 760),
+          child: DataTable(
+            headingRowHeight: 44,
+            dataRowMinHeight: 48,
+            dataRowMaxHeight: 56,
+            horizontalMargin: 12,
+            columnSpacing: 18,
+            headingTextStyle: const TextStyle(fontWeight: FontWeight.w700),
+            columns: [
+              DataColumn(label: _cell('Module', bold: true)),
+              DataColumn(label: _cell('Coef', bold: true, center: true), numeric: true),
+              DataColumn(label: _cell('Cred', bold: true, center: true), numeric: true),
+              DataColumn(label: _cell('Notes (TD / TP / EXAM)', bold: true)),
+              DataColumn(label: _cell('Moyenne module', bold: true, center: true), numeric: true),
+              DataColumn(label: _cell('Cred Mod', bold: true, center: true), numeric: true),
+            ],
+            rows: sem.modules.map((m) {
+              final noteCells = Directionality(
+                textDirection: TextDirection.ltr,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (m.hasTD)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
+                        child: _NumField(
+                          value: m.td,
+                          onChanged: (v) {
+                            m.td = v;
+                            sem.recompute();
+                          },
+                        ),
+                      ),
+                    if (m.hasTP)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
+                        child: _NumField(
+                          value: m.tp,
+                          onChanged: (v) {
+                            m.tp = v;
+                            sem.recompute();
+                          },
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
+                      child: _NumField(
+                        value: m.exam,
+                        onChanged: (v) {
+                          m.exam = v;
+                          sem.recompute();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              );
 
-  final SemesterSpec semester;
-  final TextEditingController Function(String key) controllerFor;
-  final void Function(String key, String value) onNoteChanged;
-  final double Function(int moduleIndex) moduleAverage;
-  final double Function(int moduleIndex) moduleCredits;
-  final String Function(double value) formatNumber;
-  final String Function(int moduleIndex, String label) noteKey;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    if (semester.modules.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Center(
-            child: Text(
-              'لا توجد مواد لهذا السداسي.',
-              style: theme.textTheme.bodyMedium,
-            ),
+              return DataRow(
+                cells: [
+                  DataCell(_cell(m.title, bold: true)),
+                  DataCell(
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: _cell('${m.coef}', center: true),
+                    ),
+                  ),
+                  DataCell(
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: _cell('${m.credits}', center: true),
+                    ),
+                  ),
+                  DataCell(noteCells),
+                  DataCell(
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: _cell(sem.moduleAverage(m).toStringAsFixed(2), center: true),
+                    ),
+                  ),
+                  DataCell(
+                    Directionality(
+                      textDirection: TextDirection.ltr,
+                      child: _cell(sem.moduleCreditsEarned(m).toStringAsFixed(0), center: true),
+                    ),
+                  ),
+                ],
+              );
+            }).toList(),
           ),
         ),
-      );
-    }
+      ),
+    ),
+  );
+}
 
-    return Card(
-      clipBehavior: Clip.hardEdge,
+Widget buildAnnualSummary(BuildContext context, SemesterModel s1, SemesterModel s2) {
+  final moy1 = s1.semesterAverage();
+  final moy2 = s2.semesterAverage();
+  final ann = (moy1 + moy2) / 2;
+  final creds = s1.creditsEarned() + s2.creditsEarned();
+
+  Widget row(String label, String value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: Text(value),
+            ),
+          ],
+        ),
+      );
+
+  return Card(
+    margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          Container(
-            width: double.infinity,
-            color: theme.colorScheme.surfaceVariant.withOpacity(.6),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(
-              children: [
-                _headerCell('Module', flex: 5),
-                _headerCell('Coef', flex: 1),
-                _headerCell('Cred', flex: 1),
-                _headerCell('Notes TD / TP / EXAM', flex: 5),
-                _headerCell('Moyenne module', flex: 1),
-                _headerCell('Cred Mod', flex: 1),
-              ],
-            ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Text('Résumé annuel', style: Theme.of(context).textTheme.titleMedium),
           ),
-          const Divider(height: 1),
-          ...List.generate(semester.modules.length, (index) {
-            final module = semester.modules[index];
-            final avg = moduleAverage(index);
-            final credits = moduleCredits(index);
-            return Column(
-              children: [
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        flex: 5,
-                        child: Text(
-                          module.name,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      _valueCell(formatNumber(module.coef), flex: 1),
-                      _valueCell(formatNumber(module.credits), flex: 1),
-                      Expanded(
-                        flex: 5,
-                        child: Row(
-                          children:
-                              _buildNoteColumns(context, module, index),
-                        ),
-                      ),
-                      _valueCell(formatNumber(avg), flex: 1),
-                      _valueCell(formatNumber(credits), flex: 1),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-              ],
-            );
-          }),
+          const SizedBox(height: 8),
+          row('Moyenne Semester 1', moy1.toStringAsFixed(2)),
+          row('Moyenne Semester 2', moy2.toStringAsFixed(2)),
+          const Divider(height: 20),
+          row('Année', ann.toStringAsFixed(2)),
+          row('Total Credits', creds.toStringAsFixed(0)),
         ],
       ),
-    );
-  }
-
-  Widget _headerCell(String text, {int flex = 2}) {
-    return Expanded(
-      flex: flex,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: Text(
-          text,
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
-      ),
-    );
-  }
-
-  Widget _valueCell(String text, {int flex = 2}) {
-    return Expanded(
-      flex: flex,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        child: Text(
-          text,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildNoteColumns(
-      BuildContext context, ModuleSpec module, int moduleIndex) {
-    return module.evalWeights.map((weight) {
-      final fieldKey = noteKey(moduleIndex, weight.label);
-      final enabled = weight.weight > 0;
-      return Expanded(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                weight.label,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 6),
-              SizedBox(
-                height: 44,
-                child: TextField(
-                  controller: controllerFor(fieldKey),
-                  enabled: enabled,
-                  textAlign: TextAlign.center,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                    LengthLimitingTextInputFormatter(5),
-                  ],
-                  decoration: InputDecoration(
-                    isDense: true,
-                    hintText: enabled ? '0' : '—',
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 10),
-                    border: const OutlineInputBorder(),
-                  ),
-                  onChanged: (value) => onNoteChanged(fieldKey, value),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '${formatNumber(weight.weight)}%',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-        ),
-      );
-    }).toList(growable: false);
-  }
+    ),
+  );
 }
 // ============================================================================
 // PART 3/3 — Helpers, Colors, Studies helpers, Compatibility adapters
