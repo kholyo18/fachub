@@ -28,13 +28,14 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
 import 'firebase_options.dart';
+import 'ui/theme.dart';
+import 'ui/widgets/widgets.dart';
 
 // ============================================================================
 // Branding
 // ============================================================================
-const kFachubGreen = Color(0xFF16434A);
-const kFachubBlue  = Color(0xFF2F4F9D);
-const kFachubTeal  = Color(0xFF6FB1A3);
+const kFachubGreen = Color(0xFF2F9E44);
+const kFachubBlue  = Color(0xFF3557D5);
 const kNoteYellow  = Color(0xFFFFF3C4);
 
 // ============================================================================
@@ -101,8 +102,8 @@ class _FachubAppState extends State<FachubApp> {
     return MaterialApp(
       title: 'Fachub',
       debugShowCheckedModeBanner: false,
-      theme: _buildTheme(Brightness.light),
-      darkTheme: _buildTheme(Brightness.dark),
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
       themeMode: _themeMode,
       locale: _locale,
       supportedLocales: const [Locale('ar'), Locale('fr'), Locale('en')],
@@ -115,144 +116,6 @@ class _FachubAppState extends State<FachubApp> {
     );
   }
 
-  ThemeData _buildTheme(Brightness brightness) {
-    final isLight = brightness == Brightness.light;
-    final scheme = ColorScheme.fromSeed(
-      seedColor: kFachubBlue,
-      brightness: brightness,
-    ).copyWith(
-      primary: kFachubBlue,
-      secondary: kFachubTeal,
-      surface: isLight ? const Color(0xFFF6F7FB) : const Color(0xFF171A24),
-      background: isLight ? const Color(0xFFF1F2F6) : const Color(0xFF11131B),
-      surfaceVariant: isLight ? const Color(0xFFE3E6F0) : const Color(0xFF2B2F3E),
-      outlineVariant: isLight ? const Color(0xFFCACED8) : const Color(0xFF414458),
-      onSurfaceVariant: isLight ? const Color(0xFF505468) : const Color(0xFFCED1E0),
-    );
-
-    final base = ThemeData(
-      useMaterial3: true,
-      colorScheme: scheme,
-      brightness: brightness,
-      fontFamily: 'Roboto',
-    );
-
-    final textTheme = base.textTheme.copyWith(
-      displaySmall: base.textTheme.displaySmall?.copyWith(fontSize: 44),
-      headlineSmall:
-          base.textTheme.headlineSmall?.copyWith(fontSize: 28, fontWeight: FontWeight.w600),
-      titleLarge:
-          base.textTheme.titleLarge?.copyWith(fontSize: 24, fontWeight: FontWeight.w700),
-      titleMedium:
-          base.textTheme.titleMedium?.copyWith(fontSize: 20, fontWeight: FontWeight.w600),
-      bodyLarge: base.textTheme.bodyLarge?.copyWith(fontSize: 17, height: 1.55),
-      bodyMedium: base.textTheme.bodyMedium?.copyWith(fontSize: 16, height: 1.55),
-      bodySmall: base.textTheme.bodySmall?.copyWith(height: 1.45),
-      labelLarge: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600, letterSpacing: .2),
-    );
-
-    final roundedShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(18));
-
-    final appBarTheme = AppBarTheme(
-      backgroundColor: scheme.surface,
-      foregroundColor: scheme.onSurface,
-      elevation: 0,
-      titleTextStyle: textTheme.titleLarge,
-      systemOverlayStyle:
-          brightness == Brightness.dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-    );
-
-    final cardTheme = CardThemeData(
-      elevation: 2,
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      clipBehavior: Clip.antiAlias,
-      surfaceTintColor: scheme.surfaceTint,
-    );
-
-    final filledButtonTheme = FilledButtonThemeData(
-      style: FilledButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape: roundedShape,
-        textStyle: textTheme.labelLarge,
-        elevation: 2,
-      ),
-    );
-
-    final elevatedButtonTheme = ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape: roundedShape,
-        textStyle: textTheme.labelLarge,
-        elevation: 2,
-      ),
-    );
-
-    final outlinedButtonTheme = OutlinedButtonThemeData(
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-        shape: roundedShape,
-        textStyle: textTheme.labelLarge,
-      ).copyWith(
-        side: MaterialStateProperty.resolveWith(
-          (states) => BorderSide(
-            color: states.contains(MaterialState.disabled)
-                ? scheme.outlineVariant.withOpacity(.4)
-                : scheme.primary,
-          ),
-        ),
-      ),
-    );
-
-    final inputDecorationTheme = InputDecorationTheme(
-      filled: true,
-      fillColor: isLight
-          ? scheme.surfaceVariant.withOpacity(.65)
-          : scheme.surfaceVariant.withOpacity(.45),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: BorderSide(color: scheme.outlineVariant),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: BorderSide(color: scheme.primary, width: 1.6),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(20),
-        borderSide: BorderSide(color: scheme.outlineVariant.withOpacity(.7)),
-      ),
-    );
-
-    final floatingActionButtonTheme = FloatingActionButtonThemeData(
-      backgroundColor: scheme.primary,
-      foregroundColor: scheme.onPrimary,
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    );
-
-    final bottomAppBarTheme = BottomAppBarThemeData(
-      color: scheme.surface,
-      elevation: 4,
-      shape: const CircularNotchedRectangle(),
-      surfaceTintColor: scheme.surfaceTint,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-    );
-
-    return base.copyWith(
-      colorScheme: scheme,
-      textTheme: textTheme,
-      scaffoldBackgroundColor: scheme.background,
-      appBarTheme: appBarTheme,
-      cardTheme: cardTheme,
-      filledButtonTheme: filledButtonTheme,
-      elevatedButtonTheme: elevatedButtonTheme,
-      outlinedButtonTheme: outlinedButtonTheme,
-      inputDecorationTheme: inputDecorationTheme,
-      floatingActionButtonTheme: floatingActionButtonTheme,
-      bottomAppBarTheme: bottomAppBarTheme,
-    );
-  }
 }
 
 // ============================================================================
@@ -846,20 +709,23 @@ class _BottomBarState extends State<_BottomBar> {
         shape: const CircularNotchedRectangle(),
         notchMargin: 8,
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _BarItem(
-              icon: Icons.home_outlined,
-              label: 'الرئيسية',
-              selected: widget.index == 0,
-              onTap: () => widget.onTap(0),
+            Expanded(
+              child: _BarItem(
+                icon: Icons.home_outlined,
+                label: 'الرئيسية',
+                selected: widget.index == 0,
+                onTap: () => widget.onTap(0),
+              ),
             ),
-            const SizedBox(width: 40), // فراغ لفتحة زر الملاحظات
-            _BarItem(
-              icon: Icons.public_outlined,
-              label: 'المجتمع',
-              selected: widget.index == 1,
-              onTap: () => widget.onTap(1),
+            const SizedBox(width: 56),
+            Expanded(
+              child: _BarItem(
+                icon: Icons.public_outlined,
+                label: 'المجتمع',
+                selected: widget.index == 1,
+                onTap: () => widget.onTap(1),
+              ),
             ),
           ],
         ),
@@ -885,10 +751,16 @@ class _BarItem extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final c = selected ? scheme.primary : scheme.onSurfaceVariant;
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? scheme.primary.withOpacity(.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(icon, color: c),
           const SizedBox(height: 2),
@@ -908,31 +780,118 @@ class HomeLandingScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.canPop(context);
-    return Scaffold(
+    final faculties = demoFaculties.take(6).toList();
+    final quickFaculty = faculties.isNotEmpty ? faculties.first : null;
+    final gridFaculties =
+        quickFaculty == null ? faculties : faculties.skip(1).toList(growable: false);
+
+    void openFaculty(ProgramFaculty faculty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => FacultyMajorsScreen(faculty: faculty)),
+      );
+    }
+
+    return AppScaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: const Text('Fachub • الرئيسية'),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
-        actions: const [],
       ),
       endDrawer: const AppEndDrawer(),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 80),
-        children: [
-          const _WelcomeHeader(),
-          const SizedBox(height: 8),
-          _FacultyGrid(faculties: demoFaculties.take(6).toList()),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => FacultiesScreen(faculties: demoFaculties)),
-              );
-            },
-            icon: const Icon(Icons.menu_book_outlined),
-            label: const Text('استعراض كل الكليات'),
+      padding: EdgeInsets.zero,
+      body: CustomScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+            sliver: SliverToBoxAdapter(
+              child: InfoCard(
+                leadingIcon: Icons.school_outlined,
+                title: 'مرحباً بك 👋',
+                subtitle:
+                    'تصفح الكليات، احسب معدلك، شارك أفكارك، ودوّن ملاحظاتك بسهولة.',
+              ),
+            ),
+          ),
+          if (quickFaculty != null) ...[
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              sliver: SliverToBoxAdapter(
+                child: SectionHeader(
+                  title: 'كليّة مقترحة',
+                  trailing: TextButton(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => FacultiesScreen(faculties: demoFaculties),
+                      ),
+                    ),
+                    child: const Text('عرض الكل'),
+                  ),
+                ),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              sliver: SliverToBoxAdapter(
+                child: _FacultyQuickCard(
+                  faculty: quickFaculty,
+                  onTap: () => openFaculty(quickFaculty),
+                ),
+              ),
+            ),
+          ] else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              sliver: const SliverToBoxAdapter(
+                child: SectionHeader(title: 'الكليات المتاحة'),
+              ),
+            ),
+          if (gridFaculties.isNotEmpty) ...[
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              sliver: const SliverToBoxAdapter(
+                child: SectionHeader(title: 'باقي الكليات'),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              sliver: SliverGrid(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final faculty = gridFaculties[index];
+                    return _FacultyTile(
+                      faculty: faculty,
+                      onTap: () => openFaculty(faculty),
+                    );
+                  },
+                  childCount: gridFaculties.length,
+                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.2,
+                ),
+              ),
+            ),
+          ],
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            sliver: SliverToBoxAdapter(
+              child: PrimaryButton(
+                label: 'استعراض كل الكليات',
+                icon: Icons.menu_book_outlined,
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FacultiesScreen(faculties: demoFaculties),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -940,75 +899,170 @@ class HomeLandingScreen extends StatelessWidget {
   }
 }
 
-class _WelcomeHeader extends StatelessWidget {
-  const _WelcomeHeader();
+class _FacultyQuickCard extends StatelessWidget {
+  const _FacultyQuickCard({required this.faculty, required this.onTap});
+
+  final ProgramFaculty faculty;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            const Icon(Icons.school, size: 40),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text('مرحباً بك 👋', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                  SizedBox(height: 4),
-                  Text('تصفح الكليات، احسب معدلك، شارك أفكارك، ودوّن ملاحظاتك بسهولة.'),
+    final theme = Theme.of(context);
+    final majorsCount = faculty.majors.length;
+    final tracksCount = faculty.majors.fold<int>(0, (sum, major) => sum + major.tracks.length);
+    final subtitle = majorsCount == 0
+        ? 'لا تخصصات مسجّلة بعد'
+        : majorsCount == 1
+            ? 'تخصص واحد متاح'
+            : '$majorsCount تخصصات متاحة';
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              if (theme.brightness == Brightness.light)
+                BoxShadow(
+                  color: theme.colorScheme.onSurface.withOpacity(.08),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 26,
+                    backgroundColor: theme.colorScheme.primary.withOpacity(.12),
+                    foregroundColor: theme.colorScheme.primary,
+                    child: const Icon(Icons.apartment_outlined),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      faculty.name,
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Text(
+                subtitle,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: MetricTile(
+                      label: 'مسارات',
+                      value: tracksCount.toString(),
+                      icon: Icons.track_changes,
+                      onTap: null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: MetricTile(
+                      label: 'تخصصات',
+                      value: majorsCount.toString(),
+                      icon: Icons.auto_awesome,
+                      onTap: null,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _FacultyGrid extends StatelessWidget {
-  final List<ProgramFaculty> faculties;
-  const _FacultyGrid({required this.faculties});
+class _FacultyTile extends StatefulWidget {
+  const _FacultyTile({required this.faculty, required this.onTap});
+
+  final ProgramFaculty faculty;
+  final VoidCallback onTap;
+
+  @override
+  State<_FacultyTile> createState() => _FacultyTileState();
+}
+
+class _FacultyTileState extends State<_FacultyTile> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      itemCount: faculties.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2, mainAxisSpacing: 8, crossAxisSpacing: 8, childAspectRatio: 1.2),
-      itemBuilder: (_, i) {
-        final f = faculties[i];
-        return Card(
-          elevation: 1,
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              Navigator.push(
-                _,
-                MaterialPageRoute(builder: (_) => FacultyMajorsScreen(faculty: f)),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.apartment_outlined, size: 30),
-                  const Spacer(),
-                  Text(f.name, maxLines: 2, overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700)),
-                ],
+    final theme = Theme.of(context);
+    final majorsCount = widget.faculty.majors.length;
+    final subtitle = majorsCount == 0
+        ? 'لا تخصصات بعد'
+        : majorsCount == 1
+            ? 'تخصص واحد'
+            : '$majorsCount تخصصات';
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeInOut,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _hovered
+                    ? theme.colorScheme.primary.withOpacity(.4)
+                    : theme.colorScheme.outlineVariant.withOpacity(.4),
               ),
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.apartment_outlined,
+                    color: theme.colorScheme.primary, size: 32),
+                const Spacer(),
+                Text(
+                  widget.faculty.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall,
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
@@ -1103,7 +1157,7 @@ class _NotesScreenState extends State<NotesScreen> {
               onArchive: () => setState(() { _notes.remove(n); _archived.add(n); }),
             )),
           ] else if (pinned.isEmpty)
-            const _EmptyHint(icon: Icons.note_alt_outlined, title: 'لا توجد ملاحظات بعد'),
+            const EmptyState(icon: Icons.note_alt_outlined, title: 'لا توجد ملاحظات بعد'),
           const SizedBox(height: 12),
           if (_archived.isNotEmpty) ...[
             const Divider(),
@@ -1282,7 +1336,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.canPop(context);
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: const Text('مجتمع Fachub'),
@@ -1297,12 +1351,27 @@ class _CommunityScreenState extends State<CommunityScreen> {
         ],
       ),
       endDrawer: const AppEndDrawer(),
+      padding: EdgeInsets.zero,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _newPost,
+        icon: const Icon(Icons.edit_note),
+        label: const Text('منشور'),
+      ),
       body: _posts.isEmpty
-          ? const _EmptyHint(
-              icon: Icons.public_outlined, title: 'لا توجد منشورات بعد')
-          : ListView.builder(
-              padding: const EdgeInsets.only(bottom: 100),
+          ? EmptyState(
+              icon: Icons.public_outlined,
+              title: 'لا توجد منشورات بعد',
+              subtitle: 'ابدأ النقاش الأول في المجتمع وشارك تجربتك مع زملائك.',
+              action: PrimaryButton(
+                label: 'أنشئ منشوراً',
+                icon: Icons.add,
+                onPressed: _newPost,
+              ),
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
               itemCount: _posts.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 16),
               itemBuilder: (_, i) => _PostCard(
                 post: _posts[i],
                 onVote: (delta) => setState(() => _posts[i].votes += delta),
@@ -1318,11 +1387,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 },
               ),
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _newPost,
-        icon: const Icon(Icons.edit_note),
-        label: const Text('منشور'),
-      ),
     );
   }
 }
@@ -1361,94 +1425,109 @@ class _PostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Card(
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(
-            children: [
-              const CircleAvatar(child: Icon(Icons.person)),
-              const SizedBox(width: 10),
-              Text('u/${post.author}',
-                  style: const TextStyle(fontWeight: FontWeight.w700)),
-              const Spacer(),
-              PopupMenuButton(
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'share', child: Text('مشاركة')),
-                  PopupMenuItem(value: 'report', child: Text('إبلاغ')),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(post.title,
-              style:
-                  const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          if (post.body.trim().isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text(post.body),
-          ],
-          if (post.mediaUrl != null) ...[
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Image.network(
-                post.mediaUrl!,
-                height: 170,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: theme.colorScheme.primary.withOpacity(.12),
+                  foregroundColor: theme.colorScheme.primary,
+                  child: const Icon(Icons.person),
+                ),
+                const SizedBox(width: 12),
+                Text('u/${post.author}',
+                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                const Spacer(),
+                PopupMenuButton(
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: 'share', child: Text('مشاركة')),
+                    PopupMenuItem(value: 'report', child: Text('إبلاغ')),
+                  ],
+                ),
+              ],
             ),
-          ],
-          if (post.tags.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              runSpacing: -8,
-              spacing: 6,
-              children: post.tags
-                  .map((t) => Chip(
-                        label: Text(t),
-                        backgroundColor: kChipGrey,
-                        side: BorderSide.none,
-                      ))
-                  .toList(),
-            )
-          ],
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => onVote(1),
-                icon: const Icon(Icons.arrow_upward),
-              ),
-              Text('${post.votes}',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              IconButton(
-                onPressed: () => onVote(-1),
-                icon: const Icon(Icons.arrow_downward),
-              ),
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: onComment,
-                icon: const Icon(Icons.mode_comment_outlined),
-                label: Text('تعليقات (${post.comments.length})'),
+            const SizedBox(height: 12),
+            Text(
+              post.title,
+              style: theme.textTheme.titleMedium,
+            ),
+            if (post.body.trim().isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(post.body, style: theme.textTheme.bodyMedium),
+            ],
+            if (post.mediaUrl != null) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.network(
+                  post.mediaUrl!,
+                  height: 190,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
               ),
             ],
-          ),
-          if (post.comments.isNotEmpty) const Divider(),
-          ...post.comments
-              .take(4)
-              .map((c) => ListTile(
-                    leading: const Icon(Icons.comment, size: 20),
-                    title: Text('u/${c.author}',
-                        style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text(c.text),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                  ))
-              .toList(),
-        ]),
+            if (post.tags.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: post.tags
+                    .map((t) => NumberChip(text: t))
+                    .toList(),
+              ),
+            ],
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                IconButton(
+                  onPressed: () => onVote(1),
+                  icon: const Icon(Icons.arrow_upward),
+                ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  child: Directionality(
+                    key: ValueKey(post.votes),
+                    textDirection: TextDirection.ltr,
+                    child: Text(
+                      '${post.votes}',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => onVote(-1),
+                  icon: const Icon(Icons.arrow_downward),
+                ),
+                const SizedBox(width: 12),
+                TextButton.icon(
+                  onPressed: onComment,
+                  icon: const Icon(Icons.mode_comment_outlined),
+                  label: Text('تعليقات (${post.comments.length})'),
+                ),
+              ],
+            ),
+            if (post.comments.isNotEmpty) ...[
+              const Divider(height: 24),
+              ...post.comments.take(4).map(
+                (c) => ListTile(
+                  leading: const Icon(Icons.comment, size: 20),
+                  title: Text('u/${c.author}',
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700)),
+                  subtitle: Text(c.text),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -2220,18 +2299,18 @@ class FacultiesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.canPop(context);
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: const Text('الدراسة • الكليات'),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
-        actions: const [],
       ),
       endDrawer: const AppEndDrawer(),
+      padding: EdgeInsets.zero,
       body: ListView.separated(
         itemCount: faculties.length,
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
         separatorBuilder: (_, __) => const SizedBox(height: 14),
         itemBuilder: (_, i) {
           final f = faculties[i];
@@ -2288,15 +2367,15 @@ class FacultyMajorsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.canPop(context);
-    return Scaffold(
+    return AppScaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text('الدراسة • ${faculty.name}'),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
-        actions: const [],
       ),
       endDrawer: const AppEndDrawer(),
+      padding: EdgeInsets.zero,
       body: ListView.separated(
         itemCount: faculty.majors.length,
         separatorBuilder: (_, __) => const Divider(height: 1),
@@ -2437,10 +2516,15 @@ class _StudiesTableScreenState extends State<StudiesTableScreen>
     return Builder(
       builder: (context) {
         final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-        const summaryPadding = 160.0;
-        return SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(0, 8, 0, summaryPadding + bottomInset),
-          child: buildSemesterTable(context, semester),
+        const summaryPadding = 220.0;
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 250),
+          child: SingleChildScrollView(
+            key: ValueKey('${semester.name}_${semester.modules.length}'),
+            padding: EdgeInsets.fromLTRB(0, 8, 0, summaryPadding + bottomInset),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            child: buildSemesterTable(context, semester),
+          ),
         );
       },
     );
@@ -2480,44 +2564,52 @@ class _StudiesTableScreenState extends State<StudiesTableScreen>
     final sem2 = _semester2;
     final canPop = Navigator.canPop(context);
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
+    return AppScaffold(
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text(widget.facultyName),
         leading: _DrawerLeading(showBack: canPop),
         leadingWidth: canPop ? 96 : null,
-        actions: const [],
       ),
       endDrawer: const AppEndDrawer(),
-      bottomNavigationBar: SafeArea(
-        child: _AnnualSummaryCard(semester1: sem1, semester2: sem2),
+      padding: EdgeInsets.zero,
+      bottomNavigationBar: Builder(
+        builder: (context) {
+          final inset = MediaQuery.of(context).viewInsets.bottom;
+          return AnimatedPadding(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOut,
+            padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + inset),
+            child: SafeArea(
+              top: false,
+              child: _AnnualSummaryCard(semester1: sem1, semester2: sem2),
+            ),
+          );
+        },
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildStickyHeader(context),
-            Material(
-              color: Theme.of(context).colorScheme.surface,
-              child: TabBar(
-                controller: _tabController,
-                tabs: const [
-                  Tab(text: 'S1'),
-                  Tab(text: 'S2'),
-                ],
-              ),
+      body: Column(
+        children: [
+          _buildStickyHeader(context),
+          Material(
+            color: Theme.of(context).colorScheme.surface,
+            child: TabBar(
+              controller: _tabController,
+              tabs: const [
+                Tab(text: 'S1'),
+                Tab(text: 'S2'),
+              ],
             ),
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildSemesterTabContent(sem1),
-                  _buildSemesterTabContent(sem2),
-                ],
-              ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildSemesterTabContent(sem1),
+                _buildSemesterTabContent(sem2),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -3067,42 +3159,59 @@ class _AnnualSummaryCard extends StatelessWidget {
     final ann = double.parse(((moy1 + moy2) / 2).toStringAsFixed(2));
     final creds = semester1.creditsEarned() + semester2.creditsEarned();
 
-    Widget row(String label, String value) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Row(
-            children: [
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Directionality(
-                textDirection: TextDirection.ltr,
-                child: Text(value),
-              ),
-            ],
-          ),
-        );
-
     return Card(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      margin: const EdgeInsets.fromLTRB(0, 8, 0, 0),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text('Résumé annuel', style: Theme.of(context).textTheme.titleMedium),
+            Text('Résumé annuel', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: MetricTile(
+                    label: 'Moyenne S1',
+                    value: moy1.toStringAsFixed(2),
+                    icon: Icons.looks_one_outlined,
+                    onTap: null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: MetricTile(
+                    label: 'Moyenne S2',
+                    value: moy2.toStringAsFixed(2),
+                    icon: Icons.looks_two_outlined,
+                    onTap: null,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            row('Moyenne Semester 1', moy1.toStringAsFixed(2)),
-            row('Moyenne Semester 2', moy2.toStringAsFixed(2)),
-            const Divider(height: 20),
-            row('Année', ann.toStringAsFixed(2)),
-            row('Total Credits', creds.toStringAsFixed(2)),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: MetricTile(
+                    label: 'Année',
+                    value: ann.toStringAsFixed(2),
+                    icon: Icons.workspace_premium_outlined,
+                    onTap: null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: MetricTile(
+                    label: 'Total Credits',
+                    value: creds.toStringAsFixed(2),
+                    icon: Icons.auto_graph,
+                    onTap: null,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -3114,42 +3223,6 @@ class _AnnualSummaryCard extends StatelessWidget {
 // ============================================================================
 
 // لون خفيف للوسوم/الشرائح في المجتمع
-const kChipGrey = Color(0xFFE9ECF1);
-
-// ويدجت حالة فارغة (مخصص للمجتمع وغيره)
-class _EmptyHint extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  const _EmptyHint({required this.icon, required this.title, this.subtitle, super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final c = Theme.of(context).colorScheme;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 56, color: c.outline),
-            const SizedBox(height: 10),
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-            if (subtitle != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                subtitle!,
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(.7)),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // امتداد آمن للسلاسل (إن لم يكن موجوداً في أجزاء سابقة)
 extension SafeStringExt on String {
   String ellipsize(int max, {String ellipsis = '…'}) {
