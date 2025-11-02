@@ -153,88 +153,104 @@ class _FachubAppState extends State<FachubApp> {
 
     final roundedShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(18));
 
+    final appBarTheme = AppBarTheme(
+      backgroundColor: scheme.surface,
+      foregroundColor: scheme.onSurface,
+      elevation: 0,
+      titleTextStyle: textTheme.titleLarge,
+      systemOverlayStyle:
+          brightness == Brightness.dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+    );
+
+    final cardTheme = CardTheme(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      clipBehavior: Clip.antiAlias,
+      surfaceTintColor: scheme.surfaceTint,
+    );
+
+    final filledButtonTheme = FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        shape: roundedShape,
+        textStyle: textTheme.labelLarge,
+        elevation: 2,
+      ),
+    );
+
+    final elevatedButtonTheme = ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        shape: roundedShape,
+        textStyle: textTheme.labelLarge,
+        elevation: 2,
+      ),
+    );
+
+    final outlinedButtonTheme = OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        shape: roundedShape,
+        textStyle: textTheme.labelLarge,
+      ).copyWith(
+        side: MaterialStateProperty.resolveWith(
+          (states) => BorderSide(
+            color: states.contains(MaterialState.disabled)
+                ? scheme.outlineVariant.withOpacity(.4)
+                : scheme.primary,
+          ),
+        ),
+      ),
+    );
+
+    final inputDecorationTheme = InputDecorationTheme(
+      filled: true,
+      fillColor: isLight
+          ? scheme.surfaceVariant.withOpacity(.65)
+          : scheme.surfaceVariant.withOpacity(.45),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20),
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20),
+        borderSide: BorderSide(color: scheme.primary, width: 1.6),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(20),
+        borderSide: BorderSide(color: scheme.outlineVariant.withOpacity(.7)),
+      ),
+    );
+
+    final floatingActionButtonTheme = FloatingActionButtonThemeData(
+      backgroundColor: scheme.primary,
+      foregroundColor: scheme.onPrimary,
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    );
+
+    final bottomAppBarTheme = BottomAppBarTheme(
+      color: scheme.surface,
+      elevation: 4,
+      shape: const CircularNotchedRectangle(),
+      surfaceTintColor: scheme.surfaceTint,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+    );
+
     return base.copyWith(
       colorScheme: scheme,
       textTheme: textTheme,
       scaffoldBackgroundColor: scheme.background,
-      appBarTheme: AppBarTheme(
-        backgroundColor: scheme.surface,
-        foregroundColor: scheme.onSurface,
-        elevation: 0,
-        titleTextStyle: textTheme.titleLarge,
-        systemOverlayStyle:
-            brightness == Brightness.dark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
-      ),
-      cardTheme: CardTheme(
-        elevation: 2,
-        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        clipBehavior: Clip.antiAlias,
-        surfaceTintColor: scheme.surfaceTint,
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: roundedShape,
-          textStyle: textTheme.labelLarge,
-          elevation: 2,
-        ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: roundedShape,
-          textStyle: textTheme.labelLarge,
-          elevation: 2,
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: roundedShape,
-          textStyle: textTheme.labelLarge,
-        ).copyWith(
-          side: MaterialStateProperty.resolveWith(
-            (states) => BorderSide(
-              color: states.contains(MaterialState.disabled)
-                  ? scheme.outlineVariant.withOpacity(.4)
-                  : scheme.primary,
-            ),
-          ),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: isLight
-            ? scheme.surfaceVariant.withOpacity(.65)
-            : scheme.surfaceVariant.withOpacity(.45),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(color: scheme.outlineVariant),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(color: scheme.primary, width: 1.6),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(color: scheme.outlineVariant.withOpacity(.7)),
-        ),
-      ),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: scheme.primary,
-        foregroundColor: scheme.onPrimary,
-        elevation: 3,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      ),
-      bottomAppBarTheme: BottomAppBarTheme(
-        color: scheme.surface,
-        elevation: 4,
-        shape: const CircularNotchedRectangle(),
-        surfaceTintColor: scheme.surfaceTint,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-      ),
+      appBarTheme: appBarTheme,
+      cardTheme: cardTheme,
+      filledButtonTheme: filledButtonTheme,
+      elevatedButtonTheme: elevatedButtonTheme,
+      outlinedButtonTheme: outlinedButtonTheme,
+      inputDecorationTheme: inputDecorationTheme,
+      floatingActionButtonTheme: floatingActionButtonTheme,
+      bottomAppBarTheme: bottomAppBarTheme,
     );
   }
 }
