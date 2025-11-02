@@ -2190,103 +2190,338 @@ Widget buildSemesterTable(BuildContext context, SemesterModel sem) {
     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
     child: Directionality(
       textDirection: TextDirection.rtl,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 760),
-          child: DataTable(
-            headingRowHeight: 44,
-            dataRowMinHeight: 48,
-            dataRowMaxHeight: 56,
-            horizontalMargin: 12,
-            columnSpacing: 18,
-            headingTextStyle: const TextStyle(fontWeight: FontWeight.w700),
-            columns: [
-              DataColumn(label: _cell('Module', bold: true)),
-              DataColumn(label: _cell('Coef', bold: true, center: true), numeric: true),
-              DataColumn(label: _cell('Cred', bold: true, center: true), numeric: true),
-              DataColumn(label: _cell('Notes (TD / TP / EXAM)', bold: true)),
-              DataColumn(label: _cell('Moyenne module', bold: true, center: true), numeric: true),
-              DataColumn(label: _cell('Cred Mod', bold: true, center: true), numeric: true),
-            ],
-            rows: sem.modules.map((m) {
-              final noteCells = Directionality(
-                textDirection: TextDirection.ltr,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (m.hasTD)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
-                        child: _NumField(
-                          value: m.td,
-                          onChanged: (v) {
-                            m.td = v;
-                            sem.recompute();
-                          },
-                        ),
-                      ),
-                    if (m.hasTP)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
-                        child: _NumField(
-                          value: m.tp,
-                          onChanged: (v) {
-                            m.tp = v;
-                            sem.recompute();
-                          },
-                        ),
-                      ),
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
-                      child: _NumField(
-                        value: m.exam,
-                        onChanged: (v) {
-                          m.exam = v;
-                          sem.recompute();
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              );
-
-              return DataRow(
-                cells: [
-                  DataCell(_cell(m.title, bold: true)),
-                  DataCell(
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: _cell('${m.coef}', center: true),
-                    ),
-                  ),
-                  DataCell(
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: _cell('${m.credits}', center: true),
-                    ),
-                  ),
-                  DataCell(noteCells),
-                  DataCell(
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: _cell(sem.moduleAverage(m).toStringAsFixed(2), center: true),
-                    ),
-                  ),
-                  DataCell(
-                    Directionality(
-                      textDirection: TextDirection.ltr,
-                      child: _cell(sem.moduleCreditsEarned(m).toStringAsFixed(0), center: true),
-                    ),
-                  ),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 400) {
+            return _buildNarrowList(
+              context,
+              sem.modules,
+              moduleAverage: sem.moduleAverage,
+              onRecompute: sem.recompute,
+            );
+          }
+          return _buildWideTable(
+            context,
+            sem.modules,
+            moduleAverage: sem.moduleAverage,
+            moduleCreditsEarned: sem.moduleCreditsEarned,
+            onRecompute: sem.recompute,
+          );
+        },
       ),
     ),
   );
+}
+
+Widget _buildWideTable(
+  BuildContext context,
+  List<ModuleModel> modules, {
+  required double Function(ModuleModel module) moduleAverage,
+  required double Function(ModuleModel module) moduleCreditsEarned,
+  required VoidCallback onRecompute,
+}) {
+  return SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(minWidth: 760),
+      child: DataTable(
+        headingRowHeight: 44,
+        dataRowMinHeight: 48,
+        dataRowMaxHeight: 56,
+        horizontalMargin: 12,
+        columnSpacing: 18,
+        headingTextStyle: const TextStyle(fontWeight: FontWeight.w700),
+        columns: [
+          DataColumn(label: _cell('Module', bold: true)),
+          DataColumn(label: _cell('Coef', bold: true, center: true), numeric: true),
+          DataColumn(label: _cell('Cred', bold: true, center: true), numeric: true),
+          DataColumn(label: _cell('Notes (TD / TP / EXAM)', bold: true)),
+          DataColumn(label: _cell('Moyenne module', bold: true, center: true), numeric: true),
+          DataColumn(label: _cell('Cred Mod', bold: true, center: true), numeric: true),
+        ],
+        rows: modules.map((m) {
+          final noteCells = Directionality(
+            textDirection: TextDirection.ltr,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (m.hasTD)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
+                    child: _NumField(
+                      value: m.td,
+                      onChanged: (v) {
+                        m.td = v;
+                        onRecompute();
+                      },
+                    ),
+                  ),
+                if (m.hasTP)
+                  Padding(
+                    padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
+                    child: _NumField(
+                      value: m.tp,
+                      onChanged: (v) {
+                        m.tp = v;
+                        onRecompute();
+                      },
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(start: 4, end: 4),
+                  child: _NumField(
+                    value: m.exam,
+                    onChanged: (v) {
+                      m.exam = v;
+                      onRecompute();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          );
+
+          return DataRow(
+            cells: [
+              DataCell(_cell(m.title, bold: true)),
+              DataCell(
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: _cell('${m.coef}', center: true),
+                ),
+              ),
+              DataCell(
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: _cell('${m.credits}', center: true),
+                ),
+              ),
+              DataCell(noteCells),
+              DataCell(
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: _cell(moduleAverage(m).toStringAsFixed(2), center: true),
+                ),
+              ),
+              DataCell(
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: _cell(moduleCreditsEarned(m).toStringAsFixed(0), center: true),
+                ),
+              ),
+            ],
+          );
+        }).toList(),
+      ),
+    ),
+  );
+}
+
+Widget _buildNarrowList(
+  BuildContext context,
+  List<ModuleModel> modules, {
+  required double Function(ModuleModel module) moduleAverage,
+  required VoidCallback onRecompute,
+}) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Column(
+      children: [
+        for (var i = 0; i < modules.length; i++) ...[
+          if (i > 0) const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: _ModuleCard(
+              module: modules[i],
+              moduleAverage: moduleAverage,
+              onRecompute: onRecompute,
+            ),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+class _ModuleCard extends StatelessWidget {
+  const _ModuleCard({
+    required this.module,
+    required this.moduleAverage,
+    required this.onRecompute,
+  });
+
+  final ModuleModel module;
+  final double Function(ModuleModel module) moduleAverage;
+  final VoidCallback onRecompute;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final labelStyle = theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600);
+    final average = moduleAverage(module).toStringAsFixed(2);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                module.title,
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Directionality(
+              textDirection: TextDirection.ltr,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  _ModuleBadge(label: 'Coef ${_formatDouble(module.coef)}'),
+                  _ModuleBadge(label: 'Cred ${_formatDouble(module.credits)}'),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Divider(color: theme.dividerColor.withOpacity(.7), height: 16),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Notes (TD / TP / EXAM)', style: labelStyle),
+                  const SizedBox(height: 8),
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Row(
+                      children: [
+                        _NoteField(
+                          label: 'TD',
+                          enabled: module.hasTD,
+                          value: module.td,
+                          padding: EdgeInsetsDirectional.zero,
+                          onChanged: (v) {
+                            module.td = v;
+                            onRecompute();
+                          },
+                        ),
+                        _NoteField(
+                          label: 'TP',
+                          enabled: module.hasTP,
+                          value: module.tp,
+                          onChanged: (v) {
+                            module.tp = v;
+                            onRecompute();
+                          },
+                        ),
+                        _NoteField(
+                          label: 'EXAM',
+                          enabled: true,
+                          value: module.exam,
+                          onChanged: (v) {
+                            module.exam = v;
+                            onRecompute();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text('Moy.', style: labelStyle),
+                const SizedBox(height: 4),
+                Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: Text(
+                    average,
+                    style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ModuleBadge extends StatelessWidget {
+  const _ModuleBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceVariant.withOpacity(.7),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        label,
+        style: theme.textTheme.bodySmall,
+      ),
+    );
+  }
+}
+
+class _NoteField extends StatelessWidget {
+  const _NoteField({
+    required this.label,
+    required this.enabled,
+    required this.value,
+    required this.onChanged,
+    this.padding = const EdgeInsetsDirectional.only(start: 8),
+  });
+
+  final String label;
+  final bool enabled;
+  final double? value;
+  final ValueChanged<double?> onChanged;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = _NumField(value: value, onChanged: onChanged);
+    final field = enabled
+        ? content
+        : IgnorePointer(child: Opacity(opacity: 0.35, child: content));
+
+    return Padding(
+      padding: padding,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: 4),
+          field,
+        ],
+      ),
+    );
+  }
+}
+
+String _formatDouble(double value) {
+  if (value.truncateToDouble() == value) {
+    return value.toStringAsFixed(0);
+  }
+  return value.toStringAsFixed(2);
 }
 
 Widget buildAnnualSummary(BuildContext context, SemesterModel s1, SemesterModel s2) {
