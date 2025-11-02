@@ -2013,9 +2013,9 @@ class ModuleModel {
         credits = credits.toDouble(),
         _hasTD = tdWeight > 0,
         _hasTP = tpWeight > 0,
-        wTD = tdWeight > 0 ? 0.3333 : 0.0,
-        wTP = tpWeight > 0 ? 0.0 : 0.0,
-        wEX = examWeight > 0 ? 0.6667 : 0.0;
+        wTD = tdWeight > 0 ? 0.40 : 0.0,
+        wTP = tpWeight > 0 ? 0.00 : 0.0,
+        wEX = examWeight > 0 ? 0.60 : 0.0;
 
   final String title;
   double coef;
