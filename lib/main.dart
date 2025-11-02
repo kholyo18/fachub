@@ -33,7 +33,8 @@ import 'firebase_options.dart';
 // Branding
 // ============================================================================
 const kFachubGreen = Color(0xFF16434A);
-const kFachubBlue  = Color(0xFF2365EB);
+const kFachubBlue  = Color(0xFF2F4F9D);
+const kFachubTeal  = Color(0xFF6FB1A3);
 const kNoteYellow  = Color(0xFFFFF3C4);
 
 // ============================================================================
@@ -97,17 +98,11 @@ class _FachubAppState extends State<FachubApp> {
 
   @override
   Widget build(BuildContext context) {
-    final base = ThemeData(
-      useMaterial3: true,
-      colorSchemeSeed: kFachubBlue,
-      fontFamily: 'Roboto',
-    );
-
     return MaterialApp(
       title: 'Fachub',
       debugShowCheckedModeBanner: false,
-      theme: base.copyWith(brightness: Brightness.light),
-      darkTheme: base.copyWith(brightness: Brightness.dark),
+      theme: _buildTheme(Brightness.light),
+      darkTheme: _buildTheme(Brightness.dark),
       themeMode: _themeMode,
       locale: _locale,
       supportedLocales: const [Locale('ar'), Locale('fr'), Locale('en')],
@@ -117,6 +112,120 @@ class _FachubAppState extends State<FachubApp> {
         GlobalCupertinoLocalizations.delegate,
       ],
       home: const AuthGate(),
+    );
+  }
+
+  ThemeData _buildTheme(Brightness brightness) {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: kFachubBlue,
+      primary: kFachubBlue,
+      secondary: kFachubTeal,
+      brightness: brightness,
+    ).copyWith(
+      surfaceVariant: brightness == Brightness.light
+          ? const Color(0xFFE3E6F0)
+          : const Color(0xFF2E3140),
+      outlineVariant: brightness == Brightness.light
+          ? const Color(0xFFCACED8)
+          : const Color(0xFF414458),
+    );
+
+    final base = ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      brightness: brightness,
+      fontFamily: 'Roboto',
+    );
+
+    final textTheme = base.textTheme.copyWith(
+      displaySmall: base.textTheme.displaySmall?.copyWith(fontSize: 44),
+      headlineSmall:
+          base.textTheme.headlineSmall?.copyWith(fontSize: 26, fontWeight: FontWeight.w600),
+      titleLarge:
+          base.textTheme.titleLarge?.copyWith(fontSize: 22, fontWeight: FontWeight.w700),
+      titleMedium:
+          base.textTheme.titleMedium?.copyWith(fontSize: 18, fontWeight: FontWeight.w600),
+      bodyLarge: base.textTheme.bodyLarge?.copyWith(height: 1.5),
+      bodyMedium: base.textTheme.bodyMedium?.copyWith(fontSize: 15, height: 1.5),
+      bodySmall: base.textTheme.bodySmall?.copyWith(height: 1.4),
+      labelLarge: base.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+    );
+
+    final roundedShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(18));
+
+    return base.copyWith(
+      colorScheme: scheme,
+      textTheme: textTheme,
+      scaffoldBackgroundColor: scheme.background,
+      appBarTheme: AppBarTheme(
+        backgroundColor: scheme.surface,
+        foregroundColor: scheme.onSurface,
+        elevation: 0,
+        titleTextStyle: textTheme.titleLarge,
+        systemOverlayStyle: brightness == Brightness.dark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
+      ),
+      cardTheme: CardTheme(
+        elevation: 2,
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: roundedShape,
+        clipBehavior: Clip.antiAlias,
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: roundedShape,
+          textStyle: textTheme.labelLarge,
+          elevation: 2,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: roundedShape,
+          textStyle: textTheme.labelLarge,
+          elevation: 2,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+          shape: roundedShape,
+          textStyle: textTheme.labelLarge,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: brightness == Brightness.light
+            ? scheme.surfaceVariant.withOpacity(.6)
+            : scheme.surfaceVariant.withOpacity(.4),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: scheme.outlineVariant),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: scheme.primary, width: 1.6),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: scheme.outlineVariant.withOpacity(.7)),
+        ),
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: scheme.primary,
+        foregroundColor: scheme.onPrimary,
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+      bottomAppBarTheme: BottomAppBarTheme(
+        color: scheme.surface,
+        elevation: 2,
+        surfaceTintColor: scheme.surfaceTint,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+      ),
     );
   }
 }
@@ -404,6 +513,37 @@ class _LanguageSheet extends StatelessWidget {
   }
 }
 
+class _DrawerLeading extends StatelessWidget {
+  final bool showBack;
+  const _DrawerLeading({required this.showBack});
+
+  @override
+  Widget build(BuildContext context) {
+    final menuButton = Builder(
+      builder: (ctx) => IconButton(
+        icon: const Icon(Icons.menu_open),
+        tooltip: MaterialLocalizations.of(ctx).openAppDrawerTooltip,
+        onPressed: () => Scaffold.of(ctx).openEndDrawer(),
+      ),
+    );
+
+    if (!showBack) {
+      return menuButton;
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        BackButton(
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+        const SizedBox(width: 4),
+        menuButton,
+      ],
+    );
+  }
+}
+
 // ============================================================================
 // Auth Gate + SignIn
 // ============================================================================
@@ -581,6 +721,8 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
       ),
       bottomNavigationBar: _BottomBar(
         index: _current,
+        controller: _page,
+        pageCount: 3,
         onTap: _go,
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
@@ -595,43 +737,103 @@ class _NoteFab extends StatelessWidget {
   const _NoteFab({required this.onTap});
   @override
   Widget build(BuildContext context) {
-    return FloatingActionButton.large(
-      elevation: 2,
-      onPressed: onTap,
-      child: const Icon(Icons.note_alt_outlined, size: 30),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: FloatingActionButton(
+        elevation: 3,
+        onPressed: onTap,
+        child: const Icon(Icons.note_alt_outlined, size: 28),
+      ),
     );
   }
 }
 
 // شريط سفلي مع شكل احترافي
-class _BottomBar extends StatelessWidget {
+class _BottomBar extends StatefulWidget {
   final int index;
   final void Function(int) onTap;
-  const _BottomBar({required this.index, required this.onTap});
+  final PageController controller;
+  final int pageCount;
+  const _BottomBar({
+    required this.index,
+    required this.onTap,
+    required this.controller,
+    this.pageCount = 3,
+  });
+
+  @override
+  State<_BottomBar> createState() => _BottomBarState();
+}
+
+class _BottomBarState extends State<_BottomBar> {
+  double _dragExtent = 0;
+  double _startPixels = 0;
+  bool _isDragging = false;
+
+  void _handlePanEnd([DragEndDetails? details]) {
+    if (!_isDragging || !widget.controller.hasClients) {
+      _dragExtent = 0;
+      _isDragging = false;
+      return;
+    }
+
+    _isDragging = false;
+    final currentPage = widget.controller.page ?? widget.index.toDouble();
+    int target = currentPage.round();
+    final velocityX = details?.velocity.pixelsPerSecond.dx ?? 0;
+    if (velocityX <= -200 && target < widget.pageCount - 1) {
+      target += 1;
+    } else if (velocityX >= 200 && target > 0) {
+      target -= 1;
+    }
+    target = target.clamp(0, widget.pageCount - 1);
+    _dragExtent = 0;
+    widget.onTap(target);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return BottomAppBar(
-      height: 68,
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 8,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _BarItem(
-            icon: Icons.home_outlined,
-            label: 'الرئيسية',
-            selected: index == 0,
-            onTap: () => onTap(0),
-          ),
-          const SizedBox(width: 40), // فراغ لفتحة زر الملاحظات
-          _BarItem(
-            icon: Icons.public_outlined,
-            label: 'المجتمع',
-            selected: index == 1,
-            onTap: () => onTap(1),
-          ),
-        ],
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (_) {
+        _dragExtent = 0;
+        _isDragging = true;
+        if (widget.controller.hasClients) {
+          _startPixels = widget.controller.position.pixels;
+        }
+      },
+      onPanUpdate: (details) {
+        if (!widget.controller.hasClients) return;
+        _dragExtent += details.delta.dx;
+        final position = widget.controller.position;
+        final target = (_startPixels - _dragExtent)
+            .clamp(position.minScrollExtent, position.maxScrollExtent);
+        position.jumpTo(target);
+      },
+      onPanEnd: _handlePanEnd,
+      onPanCancel: () => _handlePanEnd(),
+      child: BottomAppBar(
+        height: 68,
+        shape: const CircularNotchedRectangle(),
+        notchMargin: 8,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _BarItem(
+              icon: Icons.home_outlined,
+              label: 'الرئيسية',
+              selected: widget.index == 0,
+              onTap: () => widget.onTap(0),
+            ),
+            const SizedBox(width: 40), // فراغ لفتحة زر الملاحظات
+            _BarItem(
+              icon: Icons.public_outlined,
+              label: 'المجتمع',
+              selected: widget.index == 1,
+              onTap: () => widget.onTap(1),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -651,9 +853,8 @@ class _BarItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final c = selected
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).hintColor;
+    final scheme = Theme.of(context).colorScheme;
+    final c = selected ? scheme.primary : scheme.onSurfaceVariant;
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
@@ -677,15 +878,12 @@ class HomeLandingScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Fachub • الرئيسية'),
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_open),
-            onPressed: () => Scaffold.of(ctx).openEndDrawer(),
-          ),
-        ),
+        leading: _DrawerLeading(showBack: canPop),
+        leadingWidth: canPop ? 96 : null,
       ),
       endDrawer: const AppEndDrawer(),
       body: ListView(
@@ -828,10 +1026,13 @@ class _NotesScreenState extends State<NotesScreen> {
     final q = _search.text.trim().toLowerCase();
     final pinned = _notes.where((e) => e.pinned && (q.isEmpty || e.match(q))).toList();
     final others = _notes.where((e) => !e.pinned && (q.isEmpty || e.match(q))).toList();
+    final canPop = Navigator.canPop(context);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('ملاحظاتي'),
+        leading: _DrawerLeading(showBack: canPop),
+        leadingWidth: canPop ? 96 : null,
         actions: [
           IconButton(onPressed: _create, icon: const Icon(Icons.add_task_outlined)),
         ],
@@ -843,12 +1044,9 @@ class _NotesScreenState extends State<NotesScreen> {
           TextField(
             controller: _search,
             onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               hintText: 'ابحث داخل الملاحظات…',
-              prefixIcon: const Icon(Icons.search),
-              filled: true,
-              fillColor: Theme.of(context).colorScheme.surfaceVariant.withOpacity(.3),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              prefixIcon: Icon(Icons.search),
             ),
           ),
           const SizedBox(height: 10),
@@ -1051,9 +1249,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('مجتمع Fachub'),
+        leading: _DrawerLeading(showBack: canPop),
+        leadingWidth: canPop ? 96 : null,
         actions: [
           IconButton(
             tooltip: 'منشور جديد',
@@ -1363,8 +1564,13 @@ class CalculatorHubScreen extends StatelessWidget {
   const CalculatorHubScreen({super.key});
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('حاسبة المعدل')),
+      appBar: AppBar(
+        title: const Text('حاسبة المعدل'),
+        leading: _DrawerLeading(showBack: canPop),
+        leadingWidth: canPop ? 96 : null,
+      ),
       endDrawer: const AppEndDrawer(),
       body: ListView(
         padding: const EdgeInsets.all(12),
@@ -1435,8 +1641,13 @@ class _QuickAverageScreenState extends State<QuickAverageScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('حساب سريع')),
+      appBar: AppBar(
+        title: const Text('حساب سريع'),
+        leading: _DrawerLeading(showBack: canPop),
+        leadingWidth: canPop ? 96 : null,
+      ),
       endDrawer: const AppEndDrawer(),
       body: ListView(
         padding: const EdgeInsets.all(12),
@@ -1935,31 +2146,58 @@ class FacultiesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('الدراسة • الكليات'),
-        leading: Builder(
-          builder: (ctx) => IconButton(
-            icon: const Icon(Icons.menu_open),
-            onPressed: () => Scaffold.of(ctx).openEndDrawer(),
-          ),
-        ),
+        leading: _DrawerLeading(showBack: canPop),
+        leadingWidth: canPop ? 96 : null,
       ),
       endDrawer: const AppEndDrawer(),
       body: ListView.separated(
         itemCount: faculties.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+        separatorBuilder: (_, __) => const SizedBox(height: 14),
         itemBuilder: (_, i) {
           final f = faculties[i];
-          return ListTile(
-            leading: const Icon(Icons.apartment_outlined),
-            title:
-                Text(f.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => FacultyMajorsScreen(faculty: f)));
-            },
+          final theme = Theme.of(context);
+          final majorsCount = f.majors.length;
+          final subtitleText = majorsCount == 0
+              ? 'لا تخصصات مسجّلة بعد'
+              : majorsCount == 1
+                  ? 'تخصص واحد'
+                  : '$majorsCount تخصصات';
+          return Card(
+            margin: EdgeInsets.zero,
+            color: theme.colorScheme.surfaceVariant
+                .withOpacity(theme.brightness == Brightness.dark ? .35 : .6),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => FacultyMajorsScreen(faculty: f)),
+                );
+              },
+              child: ListTile(
+                leading: CircleAvatar(
+                  radius: 24,
+                  backgroundColor: theme.colorScheme.primary.withOpacity(.12),
+                  foregroundColor: theme.colorScheme.primary,
+                  child: const Icon(Icons.apartment_rounded),
+                ),
+                title: Text(
+                  f.name,
+                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  subtitleText,
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                trailing: Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
           );
         },
       ),
@@ -1974,8 +2212,13 @@ class FacultyMajorsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Scaffold(
-      appBar: AppBar(title: Text('الدراسة • ${faculty.name}')),
+      appBar: AppBar(
+        title: Text('الدراسة • ${faculty.name}'),
+        leading: _DrawerLeading(showBack: canPop),
+        leadingWidth: canPop ? 96 : null,
+      ),
       endDrawer: const AppEndDrawer(),
       body: ListView.separated(
         itemCount: faculty.majors.length,
@@ -2012,8 +2255,13 @@ class MajorTracksScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
     return Scaffold(
-      appBar: AppBar(title: Text('الدراسة • ${major.name}')),
+      appBar: AppBar(
+        title: Text('الدراسة • ${major.name}'),
+        leading: _DrawerLeading(showBack: canPop),
+        leadingWidth: canPop ? 96 : null,
+      ),
       endDrawer: const AppEndDrawer(),
       body: ListView.separated(
         itemCount: major.tracks.length,
@@ -2142,10 +2390,13 @@ class _StudiesTableScreenState extends State<StudiesTableScreen>
     final s2Avg = sem2.semesterAverage();
     final yearAvg = (s1Avg + s2Avg) / 2;
     final totalCredits = sem1.creditsEarned() + sem2.creditsEarned();
+    final canPop = Navigator.canPop(context);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.facultyName),
+        leading: _DrawerLeading(showBack: canPop),
+        leadingWidth: canPop ? 96 : null,
       ),
       endDrawer: const AppEndDrawer(),
       body: SafeArea(
